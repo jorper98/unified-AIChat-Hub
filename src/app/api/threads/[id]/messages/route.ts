@@ -14,12 +14,23 @@ export async function GET(
       return NextResponse.json({ error: "Invalid thread ID format" }, { status: 400 });
     }
 
+    const thread = await db.collection('threads').findOne({ _id: new ObjectId(threadId) });
     const messages = await db.collection('messages')
       .find({ threadId: new ObjectId(threadId) })
       .sort({ createdAt: 1 })
       .toArray();
 
-    return NextResponse.json({ messages });
+    return NextResponse.json({ 
+      thread: thread ? {
+        id: thread._id.toString(),
+        name: thread.name,
+        currentModel: thread.currentModel,
+        systemInstruction: thread.systemInstruction,
+        createdAt: thread.createdAt,
+        updatedAt: thread.updatedAt
+      } : null,
+      messages 
+    });
   } catch (error: any) {
     console.error("Thread messages fetch failure:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

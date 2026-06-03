@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.0.8
+- Prompt name display after model (shows saved prompt used for response)
+- System prompt restoration when loading existing threads
+- Prompt name persistence across thread loads
+- Active prompt indicator badge in UI
+- Raw data modal now includes thread metadata and system instructions
+- Fixed MongoDB ObjectId serialization for saved prompts API
+- System instruction tracking per message in database
+
+## v0.0.7
+- Dark/light theme toggle with localStorage persistence
+- Chat auto-scrolls to latest response
+- Footer font size increased
+- Thread metadata (systemInstruction, currentModel, dates) in raw data view
+- System instruction shown per message in chat
+
+## v0.0.6
+- Smart thread naming from first message content
+- Inline thread rename with hover edit button
+- Relative date display (e.g., "2h ago") next to thread ID
+- Markdown rendering with syntax highlighting for code blocks
+- Copy button on assistant responses (hover to reveal)
+- Token estimation with context usage bar
+- Cost calculator modal with model pricing ($ button)
+- Local development support (port 3031, MongoDB in Docker)
+
 ## v0.0.5
 - Initial commit of unified-chat sandbox
 - Next.js 14 app with MongoDB integration

@@ -22,10 +22,9 @@ services:
   mongo_db:
     image: mongo:6.0
     container_name: chat_mongo_db
-    # Using 'expose' instead of 'ports' keeps the database accessible inside 
-    # the Docker network but safely hidden from your host Windows machine.
-    expose:
-      - "27017"
+    # Expose MongoDB on localhost so local Next.js dev can connect
+    ports:
+      - "27017:27017"
     # The database container holds the data files AND the backup mounts
     volumes:
       - ./data:/data/db

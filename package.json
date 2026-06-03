@@ -1,9 +1,9 @@
 {
   "name": "unified-chat-hub",
-  "version": "0.0.5",
+  "version": "0.0.8",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3031",
     "build": "next build",
     "start": "next start"
   },
