@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.1.0
+- Text-to-image model support: automatic extraction from OpenRouter/Gemini API responses
+- Smart context optimization: base64 images saved to public/images/, replaced with lightweight markdown links
+- Image cost tracking in cost calculator (actual OpenRouter costs + image token counts)
+- Fixed model dropdown: non-OpenRouter models (Ollama, LLM Studio) now appear correctly
+- Settings Model Configuration: single table layout with drag-and-drop row reordering
+- Model ID validation: per-row check and validate-all against provider APIs
+- Invalid model IDs shown in red with warning indicators
+- Model search and provider filter in settings
+- Backup & Restore: export all data + images as ZIP, restore with replace or merge mode
+- public/images/ folder added to .gitignore
+
 ## v0.0.9
 - Theme color configuration (customizable dark/light colors with live preview)
 - Settings sidebar navigation (Models, Providers, Theme Colors sections)

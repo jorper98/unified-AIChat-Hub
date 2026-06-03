@@ -8,10 +8,18 @@ This workspace securely anchors conversational prompt stream history and configu
 
 # Release Information
 
-**Current Sandbox Tracking Release:** `v0.0.9`
+**Current Sandbox Tracking Release:** `v0.1.0`
 ---
 
 ## Key Architecture & Features
+
+### 🖼️ Text-to-Image Generation & Smart Context Optimization
+Full support for text-to-image models (e.g., Gemini 3.1 Flash Image, Flux Pro, SDXL). When an image is generated:
+- The base64 payload is automatically extracted from the API response
+- Images are saved to the `public/images/` folder with unique filenames
+- The chat message stores only a lightweight markdown link instead of the raw base64 string
+- This keeps context windows clean and eliminates token bloat from large image payloads
+- Images render directly in the chat from saved files on subsequent loads
 
 ### 🚀 Dynamic Mid-Stream Model Hot-Swapping
 Switch seamlessly between premium models (e.g., GPT-4o, Claude 3.5 Sonnet, DeepSeek Chat, Gemini Pro) inside the *same active conversation thread*. Every response is stamped with the exact model that generated it.
@@ -24,6 +32,21 @@ Retains multi-tenant message payloads locally with explicit support for indexing
 
 ### 🔍 Global Message Search Logs
 Real-time keyword filtering across your database cluster, enabling instant search of historical chats directly from the sidebar.
+
+###  Backup & Restore
+Full data backup and restore via Settings → Backup & Restore panel. Exports a ZIP file containing:
+
+**Backup Contents:**
+- `data.json` — All database collections (threads, messages, model settings, saved prompts)
+- `images/` — All generated images from `public/images/` folder
+
+**Restore Process:**
+1. Download a backup ZIP file from the Export section
+2. In the Restore section, choose a mode:
+   - **Replace All** — Deletes all existing data, then restores everything from the backup
+   - **Merge Only** — Skips items that already exist (by ID), only adds new ones
+3. Select the backup ZIP file — data and images are restored automatically
+4. The page reloads to reflect the restored data
 
 ### 📦 Automated Sandbox Backup Daemon
 An isolated secondary database container automatically performs `mongodump` snapshot extractions every 24 hours and stores them on the host disk under:

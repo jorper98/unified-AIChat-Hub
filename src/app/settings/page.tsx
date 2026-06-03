@@ -58,7 +58,7 @@ const DEFAULT_LIGHT: ThemeColors = {
   borderAlt: '#d1d5db'
 };
 
-type SettingsSection = 'models' | 'providers' | 'theme';
+type SettingsSection = 'models' | 'providers' | 'theme' | 'backup';
 
 export default function SettingsPage() {
   const [models, setModels] = useState<Model[]>([]);
@@ -88,6 +88,10 @@ export default function SettingsPage() {
   const [selectedProviderFilters, setSelectedProviderFilters] = useState<Set<string>>(new Set());
   const [validationResults, setValidationResults] = useState<Record<string, { valid: boolean; message: string }>>({});
   const [validatingId, setValidatingId] = useState<string | null>(null);
+  const [backuping, setBackuping] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreMode, setRestoreMode] = useState<'replace' | 'merge'>('replace');
+  const [restoreResult, setRestoreResult] = useState<{ success: boolean; message: string; details?: any } | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -375,10 +379,56 @@ export default function SettingsPage() {
     });
   };
 
+  const handleBackup = async () => {
+    setBackuping(true);
+    try {
+      const res = await fetch('/api/settings/export');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `unified-chat-backup-${Date.now()}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      alert('Backup failed: ' + e.message);
+    } finally {
+      setBackuping(false);
+    }
+  };
+
+  const handleRestore = async (file: File) => {
+    setRestoring(true);
+    setRestoreResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('mode', restoreMode);
+      const res = await fetch('/api/settings/import', {
+        method: 'POST',
+        body: formData
+      });
+      const result = await res.json();
+      if (result.success) {
+        setRestoreResult({ success: true, message: result.message, details: result.details });
+        window.location.reload();
+      } else {
+        setRestoreResult({ success: false, message: result.error || 'Restore failed' });
+      }
+    } catch (e: any) {
+      setRestoreResult({ success: false, message: 'Restore failed: ' + e.message });
+    } finally {
+      setRestoring(false);
+    }
+  };
+
   const navItems: { id: SettingsSection; label: string; icon: string }[] = [
     { id: 'models', label: 'Models', icon: '' },
     { id: 'providers', label: 'Providers', icon: '' },
-    { id: 'theme', label: 'Theme Colors', icon: '' }
+    { id: 'theme', label: 'Theme Colors', icon: '' },
+    { id: 'backup', label: 'Backup & Restore', icon: '' }
   ];
 
   const colorRows: { key: keyof ThemeColors; label: string; description: string }[] = [
@@ -749,6 +799,116 @@ export default function SettingsPage() {
                 <div className={`p-4 rounded-lg border ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-100 border-gray-200'}`}>
                   <p className="text-xs text-gray-400">
                     <strong>Tip:</strong> Click the color picker or type a hex value (e.g., #1f2937). Changes apply live. Click Save Settings to persist.
+                  </p>
+                </div>
+              </>
+            )}
+
+            {activeSection === 'backup' && (
+              <>
+                <h1 className="text-2xl font-bold text-indigo-400">Backup & Restore</h1>
+                <p className="text-sm text-gray-400">Export all your data or restore from a previous backup. Includes threads, messages, settings, and saved prompts.</p>
+
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Backup Section */}
+                  <div className="border border-gray-800 rounded-lg overflow-hidden">
+                    <div className="px-4 py-3 bg-gray-800 border-b border-gray-700">
+                      <h3 className="text-sm font-semibold text-gray-200">Export Data</h3>
+                    </div>
+                    <div className="p-4 space-y-3 bg-gray-950">
+                      <p className="text-xs text-gray-500">Download a ZIP backup of all threads, messages, model settings, saved prompts, and generated images.</p>
+                      <button
+                        onClick={handleBackup}
+                        disabled={backuping}
+                        className="w-full px-3 py-2 rounded text-xs font-semibold transition text-white bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-800 disabled:text-gray-600"
+                      >
+                        {backuping ? 'Creating backup...' : 'Download Backup'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Restore Section */}
+                  <div className="border border-gray-800 rounded-lg overflow-hidden">
+                    <div className="px-4 py-3 bg-gray-800 border-b border-gray-700">
+                      <h3 className="text-sm font-semibold text-gray-200">Restore Data</h3>
+                    </div>
+                    <div className="p-4 space-y-3 bg-gray-950">
+                      <p className="text-xs text-gray-500">Upload a ZIP backup file to restore your data and images.</p>
+
+                      <div>
+                        <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 block mb-1">Restore Mode</label>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setRestoreMode('replace')}
+                            className={`flex-1 text-xs px-2 py-1.5 rounded border transition ${
+                              restoreMode === 'replace'
+                                ? 'bg-red-900/40 text-red-300 border-red-500/40'
+                                : 'bg-gray-900 text-gray-500 border-gray-700'
+                            }`}
+                            title="Deletes existing data and replaces with backup"
+                          >
+                            Replace All
+                          </button>
+                          <button
+                            onClick={() => setRestoreMode('merge')}
+                            className={`flex-1 text-xs px-2 py-1.5 rounded border transition ${
+                              restoreMode === 'merge'
+                                ? 'bg-green-900/40 text-green-300 border-green-500/40'
+                                : 'bg-gray-900 text-gray-500 border-gray-700'
+                            }`}
+                            title="Only adds items that don't already exist"
+                          >
+                            Merge Only
+                          </button>
+                        </div>
+                      </div>
+
+                      <label className="block">
+                        <input
+                          type="file"
+                          accept=".json"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleRestore(file);
+                          }}
+                          disabled={restoring}
+                          className="hidden"
+                          id="restore-file"
+                        />
+                        <span
+                          className={`block text-center px-3 py-2 rounded text-xs font-semibold transition cursor-pointer ${
+                            restoring
+                              ? 'bg-gray-800 text-gray-600'
+                              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          }`}
+                        >
+                          {restoring ? 'Restoring...' : 'Select Backup File'}
+                        </span>
+                      </label>
+
+                      {restoreResult && (
+                        <div className={`p-2 rounded text-xs ${
+                          restoreResult.success
+                            ? 'bg-green-900/30 text-green-300 border border-green-700'
+                            : 'bg-red-900/30 text-red-300 border border-red-700'
+                        }`}>
+                          {restoreResult.message}
+                          {restoreResult.details && (
+                            <div className="mt-1 text-[10px] text-gray-400">
+                              {Object.entries(restoreResult.details).map(([k, v]: [string, any]) => (
+                                <span key={k} className="block">{k}: {v.inserted} added, {v.skipped} skipped</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg border border-gray-800 bg-gray-950">
+                  <p className="text-xs text-gray-500">
+                    <strong className="text-red-400">Warning:</strong> Replace mode will delete all existing data before restoring. Merge mode only adds items that don't already exist.
                   </p>
                 </div>
               </>
