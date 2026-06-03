@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.0.9
+- Theme color configuration (customizable dark/light colors with live preview)
+- Settings sidebar navigation (Models, Providers, Theme Colors sections)
+- OpenRouter as fixed built-in provider (non-editable, auto-configured)
+- Custom provider management (add/edit/delete Ollama, LLM Studio, etc.)
+- Provider endpoint fallback (uses config defaults when settings endpoint is empty)
+- Settings page moved to unified sidebar layout
+- Fixed null content errors in message handling
+- Fixed hydration mismatch for theme persistence
+
 ## v0.0.8
 - Prompt name display after model (shows saved prompt used for response)
 - System prompt restoration when loading existing threads

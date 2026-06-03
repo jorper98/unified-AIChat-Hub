@@ -58,3 +58,23 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function PUT(request: Request) {
+  try {
+    const db = await getDb();
+    const { id, name, content } = await request.json();
+
+    if (!id || !name?.trim() || !content?.trim()) {
+      return NextResponse.json({ error: "ID, name and content required" }, { status: 400 });
+    }
+
+    await db.collection('system_prompts').updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { name: name.trim(), content: content.trim(), updatedAt: new Date() } }
+    );
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

@@ -7,6 +7,9 @@ export async function GET(request: Request) {
     const db = await getDb();
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q');
+    const archived = searchParams.get('archived');
+
+    const archivedFilter = archived === 'true' ? { archived: true } : { $or: [{ archived: { $exists: false } }, { archived: false }] };
 
     if (query) {
       // Find matching message documents
@@ -18,11 +21,9 @@ export async function GET(request: Request) {
         return NextResponse.json({ threads: [] });
       }
 
-      // Fix: Use Array.from instead of array spreading to satisfy the compiler target
       const rawThreadIds = matchingMessages.map(m => m.threadId.toString());
       const uniqueIds = Array.from(new Set(rawThreadIds));
       
-      // Explicitly instantiate ObjectIds outside the query operator
       const queryOids: ObjectId[] = uniqueIds
         .filter(id => ObjectId.isValid(id))
         .map(id => new ObjectId(id));
@@ -32,16 +33,15 @@ export async function GET(request: Request) {
       }
 
       const threads = await db.collection('threads')
-        .find({ _id: { $in: queryOids } })
+        .find({ _id: { $in: queryOids }, ...archivedFilter })
         .sort({ updatedAt: -1 })
         .toArray();
 
       return NextResponse.json({ threads });
     }
 
-    // Default: list all threads sorted by newest first
     const threads = await db.collection('threads')
-      .find({})
+      .find(archivedFilter)
       .sort({ updatedAt: -1 })
       .toArray();
 

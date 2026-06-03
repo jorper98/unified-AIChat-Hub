@@ -1,0 +1,57 @@
+{
+  "providers": [
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "type": "api",
+      "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "models": [
+        { "id": "openai/gpt-4o", "name": "GPT-4o (OpenAI)", "default": true },
+        { "id": "anthropic/claude-3.5-sonnet", "name": "Claude 3.5 Sonnet (Anthropic)", "default": true },
+        { "id": "anthropic/claude-3-opus", "name": "Claude 3 Opus (Anthropic)", "default": true },
+        { "id": "deepseek/deepseek-chat", "name": "DeepSeek Chat (DeepSeek)", "default": true },
+        { "id": "google/gemini-pro", "name": "Gemini Pro (Google)", "default": true },
+        { "id": "google/gemini-flash-lite", "name": "Gemini Flash Lite (Google)", "default": true },
+        { "id": "qwen/qwen-2.5-72b-instruct", "name": "Qwen 2.5 72B (Alibaba)", "default": true },
+        { "id": "minimax/minimax-m2.7", "name": "MiniMax M2.7 (MiniMax)", "default": true },
+        { "id": "moonshot/kimi-k2", "name": "Kimi K2 (Moonshot)", "default": true }
+      ]
+    },
+    {
+      "id": "ollama",
+      "name": "Ollama (Local Network)",
+      "type": "local",
+      "endpoint": "http://192.168.4.24:11434/api/chat",
+      "apiKeyEnv": null,
+      "models": []
+    },
+    {
+      "id": "llm-studio",
+      "name": "LLM Studio",
+      "type": "local",
+      "endpoint": "http://localhost:1234/v1/chat/completions",
+      "apiKeyEnv": null,
+      "models": []
+    },
+    {
+      "id": "openai-local",
+      "name": "OpenAI Compatible (Local)",
+      "type": "local",
+      "endpoint": "http://localhost:8000/v1/chat/completions",
+      "apiKeyEnv": null,
+      "models": []
+    }
+  ],
+  "selectedModels": [
+    "openai/gpt-4o",
+    "anthropic/claude-3.5-sonnet",
+    "anthropic/claude-3-opus",
+    "deepseek/deepseek-chat",
+    "google/gemini-pro",
+    "google/gemini-flash-lite",
+    "qwen/qwen-2.5-72b-instruct",
+    "minimax/minimax-m2.7",
+    "moonshot/kimi-k2"
+  ]
+}

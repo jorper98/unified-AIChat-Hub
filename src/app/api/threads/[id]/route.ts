@@ -35,3 +35,26 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: Request,
+  context: { params: { id: string } }
+) {
+  try {
+    const db = await getDb();
+    const threadId = context.params.id;
+
+    if (!threadId || !ObjectId.isValid(threadId)) {
+      return NextResponse.json({ error: "Invalid thread ID format" }, { status: 400 });
+    }
+
+    const oid = new ObjectId(threadId);
+    await db.collection('messages').deleteMany({ threadId: oid });
+    await db.collection('threads').deleteOne({ _id: oid });
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("Thread delete failure:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

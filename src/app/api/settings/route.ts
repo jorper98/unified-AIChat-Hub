@@ -1,40 +1,38 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import modelConfig from '@/config/models.json';
 
-// Fetch current saved settings
+const DEFAULT_PROVIDERS = modelConfig.providers.map((p: any) => ({ id: p.id, name: p.name, type: p.type }));
+const DEFAULT_MODELS = modelConfig.selectedModels.map((id: string) => {
+  for (const provider of modelConfig.providers) {
+    const model = provider.models.find((m: any) => m.id === id);
+    if (model) return { id: model.id, name: model.name, provider: provider.id };
+  }
+  return { id, name: id, provider: 'openrouter' };
+});
+
 export async function GET() {
   try {
     const db = await getDb();
     const settings = await db.collection('settings').findOne({ _id: 'global_settings' as any });
     
-    // Default fallback list if database is empty
-    const defaultModels = [
-      "openai/gpt-4o",
-      "anthropic/claude-3.5-sonnet",
-      "anthropic/claude-3-opus",
-      "deepseek/deepseek-chat",
-      "google/gemini-pro",
-      "google/gemini-flash-lite",
-      "qwen/qwen-2.5-72b-instruct"
-    ];
-
     return NextResponse.json({
-      selectedModels: settings?.selectedModels || defaultModels
+      models: settings?.models || DEFAULT_MODELS,
+      providers: settings?.providers || DEFAULT_PROVIDERS
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-// Save updated settings order
 export async function POST(request: Request) {
   try {
-    const { selectedModels } = await request.json();
+    const { models, providers } = await request.json();
     const db = await getDb();
 
     await db.collection('settings').updateOne(
       { _id: 'global_settings' as any },
-      { $set: { selectedModels, updatedAt: new Date() } },
+      { $set: { models, providers, updatedAt: new Date() } },
       { upsert: true }
     );
 

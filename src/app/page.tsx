@@ -3,9 +3,13 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { MarkdownRenderer } from './components/MarkdownRenderer';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { CostCalculator } from './components/CostCalculator';
 import { RawDataModal } from './components/RawDataModal';
-import { estimateTokens, formatTokenCount, MODEL_CONTEXT_LIMITS } from '@/lib/tokens';
+import { estimateTokens, formatTokenCount, MODEL_CONTEXT_LIMITS, MODEL_PRICING } from '@/lib/tokens';
+
+const APP_VERSION = '0.0.9';
 
 interface ChatTurn {
   role: 'user' | 'assistant';
@@ -61,7 +65,12 @@ const MASTER_NAME_MAP: Record<string, string> = {
 };
 
 export default function UnifiedChatInterface() {
-  const [threadId, setThreadId] = useState<string | null>(null);
+  const [threadId, setThreadId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('activeThreadId') || null;
+    }
+    return null;
+  });
   const [threadsList, setThreadsList] = useState<ThreadSummary[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [messages, setMessages] = useState<ChatTurn[]>([]);
@@ -72,12 +81,14 @@ export default function UnifiedChatInterface() {
   const [loading, setLoading] = useState(false);
   const [renamingThread, setRenamingThread] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    if (typeof window !== 'undefined') {
-      return (localStorage.getItem('theme') as 'dark' | 'light') || 'dark';
-    }
-    return 'dark';
-  });
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const saved = localStorage.getItem('theme') as 'dark' | 'light' | null;
+    if (saved) setTheme(saved);
+  }, []);
   const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
   const [selectedPromptName, setSelectedPromptName] = useState('');
   const [showRawData, setShowRawData] = useState(false);
@@ -85,6 +96,11 @@ export default function UnifiedChatInterface() {
   const [promptName, setPromptName] = useState('');
   const [threadMetadata, setThreadMetadata] = useState<ThreadMetadata | null>(null);
   const [showPromptModal, setShowPromptModal] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [showArchives, setShowArchives] = useState(false);
+  const [archivedThreads, setArchivedThreads] = useState<ThreadSummary[]>([]);
+  const [showAbout, setShowAbout] = useState(false);
+  const [aboutContent, setAboutContent] = useState('');
 
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
@@ -92,21 +108,36 @@ export default function UnifiedChatInterface() {
     localStorage.setItem('theme', newTheme);
   };
 
-  const isDark = theme === 'dark';
+  const isDark = mounted ? theme === 'dark' : true;
 
   // 1. Initial Load: Get dropdown models and sidebar threads
   useEffect(() => {
     fetch('/api/settings')
       .then(res => res.json())
       .then(data => {
-        if (data.selectedModels && data.selectedModels.length > 0) {
-          const formatted = data.selectedModels.map((id: string) => ({
-            id,
-            name: MASTER_NAME_MAP[id] || id
-          }));
-          setAvailableModels(formatted);
-          setModel(formatted[0].id);
-        }
+        const modelList = data.models || data.selectedModels || [];
+        const formatted = modelList.map((m: any) => ({
+          id: typeof m === 'string' ? m : m.id,
+          name: typeof m === 'string' ? (MASTER_NAME_MAP[m] || m) : m.name
+        }));
+        // Filter against OpenRouter to remove invalid model IDs
+        fetch('https://openrouter.ai/api/v1/models')
+          .then(res => res.json())
+          .then(apiData => {
+            const validIds = new Set(apiData.data?.map((m: any) => m.id) || []);
+            const validModels = formatted.filter(m => validIds.has(m.id));
+            if (validModels.length > 0) {
+              setAvailableModels(validModels);
+              setModel(validModels[0].id);
+            }
+          })
+          .catch(() => {
+            // If OpenRouter is unreachable, use all models
+            if (formatted.length > 0) {
+              setAvailableModels(formatted);
+              setModel(formatted[0].id);
+            }
+          });
       });
     fetch('/api/prompts')
       .then(res => res.json())
@@ -114,6 +145,18 @@ export default function UnifiedChatInterface() {
         if (data.prompts) setSavedPrompts(data.prompts);
       });
     refreshThreads();
+    // Load active thread if one is stored
+    const savedThreadId = localStorage.getItem('activeThreadId');
+    if (savedThreadId) {
+      loadThread(savedThreadId);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetch('/About.md')
+      .then(res => res.text())
+      .then(text => setAboutContent(text))
+      .catch(() => setAboutContent(''));
   }, []);
 
   // 2. Fetch/Search Threads for the Sidebar
@@ -133,6 +176,15 @@ export default function UnifiedChatInterface() {
     }, 300); // 300ms debounce to prevent spamming database on every keystroke
     return () => clearTimeout(delayDebounce);
   }, [searchQuery]);
+
+  // Persist active thread ID
+  useEffect(() => {
+    if (threadId) {
+      localStorage.setItem('activeThreadId', threadId);
+    } else {
+      localStorage.removeItem('activeThreadId');
+    }
+  }, [threadId]);
 
   // 3. Load a selected past thread context into view
   const loadThread = (id: string) => {
@@ -224,6 +276,108 @@ export default function UnifiedChatInterface() {
     setRenameValue('');
   };
 
+  const refreshPrompts = async () => {
+    const res = await fetch('/api/prompts');
+    const data = await res.json();
+    if (data.prompts) setSavedPrompts(data.prompts);
+  };
+
+  const saveEditedPrompt = async () => {
+    if (!editingPrompt) return;
+    try {
+      const res = await fetch('/api/prompts', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editingPrompt.id, name: editingPrompt.name, content: editingPrompt.content })
+      });
+      if (res.ok) {
+        if (editingPrompt.name === selectedPromptName) {
+          setSelectedPromptName(editingPrompt.name);
+        }
+        setEditingPrompt(null);
+        await refreshPrompts();
+      }
+    } catch (e) {
+      console.error('Failed to update prompt:', e);
+    }
+  };
+
+  const deletePrompt = async (id: string) => {
+    try {
+      const res = await fetch('/api/prompts', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      if (res.ok) {
+        setSavedPrompts(prev => prev.filter(p => p._id !== id));
+      }
+    } catch (e) {
+      console.error('Failed to delete prompt:', e);
+    }
+  };
+
+  const startEditPrompt = (prompt: SavedPrompt) => {
+    setEditingPrompt({ id: prompt._id, name: prompt.name, content: prompt.content });
+  };
+
+  const cancelEditPrompt = () => {
+    setEditingPrompt(null);
+  };
+
+  const archiveThread = async (id: string) => {
+    try {
+      const res = await fetch(`/api/threads/${id}/archive`, { method: 'PATCH' });
+      if (res.ok) {
+        setThreadsList(prev => prev.filter(t => t._id !== id));
+        if (threadId === id) {
+          setThreadId(null);
+          setMessages([]);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to archive thread:', e);
+    }
+  };
+
+  const deleteThread = async (id: string) => {
+    try {
+      const res = await fetch(`/api/threads/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setThreadsList(prev => prev.filter(t => t._id !== id));
+        if (threadId === id) {
+          setThreadId(null);
+          setMessages([]);
+        }
+        setDeleteConfirmId(null);
+      }
+    } catch (e) {
+      console.error('Failed to delete thread:', e);
+    }
+  };
+
+  const unarchiveThread = async (id: string) => {
+    try {
+      const res = await fetch(`/api/threads/${id}/archive`, { method: 'PATCH', body: JSON.stringify({ archived: false }) });
+      if (res.ok) {
+        setArchivedThreads(prev => prev.filter(t => t._id !== id));
+        refreshThreads();
+      }
+    } catch (e) {
+      console.error('Failed to unarchive thread:', e);
+    }
+  };
+
+  const loadArchivedThreads = async () => {
+    try {
+      const res = await fetch('/api/threads?archived=true');
+      const data = await res.json();
+      if (data.threads) setArchivedThreads(data.threads);
+    } catch (e) {
+      console.error('Failed to load archived threads:', e);
+    }
+  };
+
   const loadPrompt = (id: string) => {
     const prompt = savedPrompts.find(p => p._id === id);
     if (prompt) {
@@ -313,18 +467,41 @@ export default function UnifiedChatInterface() {
     <main className={`flex h-screen font-sans ${isDark ? 'bg-gray-900 text-gray-100' : 'bg-gray-50 text-gray-900'}`}>
       {/* Control Panel Panel Sidebar Container */}
       <section className={`w-80 p-4 flex flex-col gap-4 border-r h-full pb-8 ${isDark ? 'bg-gray-950 border-gray-800' : 'bg-white border-gray-200'}`}>
-        <div className="flex justify-between items-center gap-2">
-          <h1 className="text-md font-bold text-indigo-400">Unified Chat Hub</h1>
-          <div className="flex items-center gap-1">
+        <div className="flex justify-between items-start gap-2">
+          <div>
+            <h1 className="text-md font-bold text-indigo-400">Unified Chat Hub</h1>
+            <span className={`text-[9px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>v{APP_VERSION}</span>
+          </div>
+          <div className="flex items-center gap-1 pt-0.5">
+            <button
+              onClick={() => setShowAbout(true)}
+              className={`p-1.5 rounded transition ${isDark ? 'text-gray-500 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'}`}
+              title="About"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
             <button
               onClick={toggleTheme}
-              className={`text-xs px-2 py-1 rounded border transition ${isDark ? 'text-gray-400 hover:text-white bg-gray-900 border-gray-800' : 'text-gray-600 hover:text-gray-900 bg-gray-100 border-gray-300'}`}
+              className={`p-1.5 rounded transition ${isDark ? 'text-gray-500 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'}`}
               title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
             >
-              {isDark ? '☀️' : '🌙'}
+              {isDark ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              )}
             </button>
-            <Link href="/settings" className={`text-xs px-2 py-1 rounded border transition ${isDark ? 'text-gray-400 hover:text-white bg-gray-900 border-gray-800' : 'text-gray-600 hover:text-gray-900 bg-gray-100 border-gray-300'}`}>
-              ⚙ Settings
+            <Link href="/settings" className={`p-1.5 rounded transition ${isDark ? 'text-gray-500 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'}`} title="Settings">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
             </Link>
           </div>
         </div>
@@ -340,7 +517,15 @@ export default function UnifiedChatInterface() {
 
         {/* Global Search Bar Segment */}
         <div className="flex flex-col gap-1">
-          <label className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Search History logs</label>
+          <div className="flex justify-between items-center">
+            <label className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Search History logs</label>
+            <button
+              onClick={() => { setShowArchives(true); loadArchivedThreads(); }}
+              className={`text-[10px] px-1.5 py-0.5 rounded transition ${isDark ? 'text-gray-500 hover:text-indigo-400' : 'text-gray-400 hover:text-indigo-600'}`}
+            >
+              📁 Archives
+            </button>
+          </div>
           <input 
             type="text"
             placeholder="Search keywords inside chats..."
@@ -396,15 +581,31 @@ export default function UnifiedChatInterface() {
                     <span className="font-medium truncate flex-1 cursor-pointer" onClick={() => loadThread(t._id)}>
                       {t.name}
                     </span>
-                    <button
-                      onClick={() => startRename(t)}
-                      className={`text-[9px] opacity-0 group-hover:opacity-100 transition-opacity p-0.5 ${isDark ? 'text-gray-600 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
-                      title="Rename thread"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
+                    <div className="flex gap-0.5">
+                      <button
+                        onClick={() => startRename(t)}
+                        className={`text-[9px] opacity-0 group-hover:opacity-100 transition-opacity p-0.5 ${isDark ? 'text-gray-600 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
+                        title="Rename thread"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => archiveThread(t._id)}
+                        className={`text-[9px] opacity-0 group-hover:opacity-100 transition-opacity p-0.5 ${isDark ? 'text-gray-600 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
+                        title="Archive thread"
+                      >
+                        📦
+                      </button>
+                      <button
+                        onClick={() => setDeleteConfirmId(t._id)}
+                        className={`text-[9px] opacity-0 group-hover:opacity-100 transition-opacity p-0.5 ${isDark ? 'text-gray-600 hover:text-red-400' : 'text-gray-400 hover:text-red-500'}`}
+                        title="Delete thread"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
                    <span className={`text-[9px] font-mono block truncate ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                     ID: {t._id}
@@ -434,7 +635,7 @@ export default function UnifiedChatInterface() {
                 <div className={`px-4 py-3 rounded-lg text-sm leading-relaxed ${
                   msg.role === 'user' 
                     ? (isDark ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-indigo-500 text-white rounded-br-none') 
-                    : (isDark ? 'bg-gray-800 text-gray-200 rounded-bl-none' : 'bg-gray-200 text-gray-800 rounded-bl-none')
+                    : (isDark ? 'bg-gray-800 text-gray-200 rounded-bl-none' : 'bg-gray-700 text-gray-100 rounded-bl-none')
                 }`}>
                   <MarkdownRenderer content={msg.content} isUser={msg.role === 'user'} />
                 </div>
@@ -467,7 +668,7 @@ export default function UnifiedChatInterface() {
               <span>Context: {formatTokenCount(totalTokens)} / {formatTokenCount(contextLimit)} ({usagePercent}%)</span>
               <div className="flex gap-3">
                 <span>Input: ~{formatTokenCount(inputTokens)} ({input.length} chars)</span>
-                <span>Thread: ~{formatTokenCount(threadTokens)} ({messages.reduce((sum, msg) => sum + msg.content.length, 0)} chars, {messages.length} msgs)
+                <span>Thread: ~{formatTokenCount(threadTokens)} ({messages.reduce((sum, msg) => sum + (msg.content?.length || 0), 0)} chars, {messages.length} msgs)
                   <CostCalculator messages={messages} />
                 </span>
               </div>
@@ -497,14 +698,21 @@ export default function UnifiedChatInterface() {
               <button
                 onClick={handleSend}
                 disabled={loading}
-                className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-800 disabled:text-gray-600 px-6 py-3 rounded text-sm font-semibold transition shrink-0"
+                className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-800 disabled:text-gray-600 text-white px-6 py-3 rounded text-sm font-semibold transition shrink-0"
               >
                 Dispatch
               </button>
             </div>
             <div className="flex gap-3">
               <div className="flex-1 flex flex-col gap-1">
-                <label className="text-[10px] font-semibold uppercase text-gray-500 tracking-wider">Active Model</label>
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-semibold uppercase text-gray-500 tracking-wider">Active Model</label>
+                  {MODEL_PRICING[model] && (
+                    <span className={`text-[9px] font-mono ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
+                      ${MODEL_PRICING[model].input.toFixed(2)} in / ${MODEL_PRICING[model].output.toFixed(2)} out per 1M
+                    </span>
+                  )}
+                </div>
                 <select 
                   value={model} 
                   onChange={(e) => setModel(e.target.value)}
@@ -545,24 +753,24 @@ export default function UnifiedChatInterface() {
                     <button onClick={saveCurrentPrompt} className="text-[9px] bg-indigo-600 text-white px-2 py-1 rounded">OK</button>
                   </div>
                 )}
-                {savedPrompts.length > 0 && (
-                  <button
-                    onClick={() => setShowPromptModal(true)}
-                    className={`w-full border rounded px-1.5 py-1 text-xs focus:outline-none mb-1 text-left flex justify-between items-center ${isDark ? 'bg-gray-900 border-gray-700 text-gray-400 hover:text-gray-200' : 'bg-gray-100 border-gray-300 text-gray-600 hover:text-gray-800'}`}
-                  >
-                    <span>📋 Load saved prompt...</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                )}
-                <textarea 
-                  value={systemPrompt}
-                  onChange={(e) => setSystemPrompt(e.target.value)}
-                  rows={1}
-                  className={`w-full border rounded px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500 resize-none ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-                  placeholder="You are a helpful assistant."
-                />
+                <div className="flex gap-1">
+                  <textarea 
+                    value={systemPrompt}
+                    onChange={(e) => setSystemPrompt(e.target.value)}
+                    rows={1}
+                    className={`flex-1 border rounded px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500 resize-none ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                    placeholder="You are a helpful assistant."
+                  />
+                  {savedPrompts.length > 0 && (
+                    <button
+                      onClick={() => setShowPromptModal(true)}
+                      className={`border rounded px-2 py-1.5 text-xs shrink-0 ${isDark ? 'bg-gray-900 border-gray-700 text-gray-400 hover:text-gray-200' : 'bg-gray-100 border-gray-300 text-gray-600 hover:text-gray-800'}`}
+                      title="Load saved prompt"
+                    >
+                      📋
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -593,21 +801,115 @@ export default function UnifiedChatInterface() {
               <h3 className={`text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>Load System Prompt</h3>
               <button onClick={() => setShowPromptModal(false)} className={`text-xs px-2 py-1 rounded ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}></button>
             </div>
-            <div className="p-2 max-h-60 overflow-y-auto">
+            <div className="p-3 max-h-80 overflow-y-auto space-y-2">
               {savedPrompts.map(p => (
-                <button
-                  key={p._id}
-                  onClick={() => { loadPrompt(p._id); setShowPromptModal(false); }}
-                  className={`w-full text-left p-2.5 rounded mb-1 transition ${
+                editingPrompt?.id === p._id ? (
+                  <div key={p._id} className={`p-3 rounded-lg border ${isDark ? 'bg-gray-800 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                    <input
+                      type="text"
+                      value={editingPrompt.name}
+                      onChange={(e) => setEditingPrompt({...editingPrompt, name: e.target.value})}
+                      className={`w-full border rounded px-2 py-1 text-xs mb-2 focus:outline-none focus:border-indigo-500 ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                      placeholder="Prompt name"
+                    />
+                    <textarea
+                      value={editingPrompt.content}
+                      onChange={(e) => setEditingPrompt({...editingPrompt, content: e.target.value})}
+                      rows={3}
+                      className={`w-full border rounded px-2 py-1 text-xs mb-2 focus:outline-none focus:border-indigo-500 resize-none ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                      placeholder="System instructions..."
+                    />
+                    <div className="flex gap-1 justify-end">
+                      <button onClick={cancelEditPrompt} className={`text-[10px] px-2 py-1 rounded ${isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>Cancel</button>
+                      <button onClick={saveEditedPrompt} className="text-[10px] px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-500">Save</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div key={p._id} className={`p-2.5 rounded-lg border transition ${
                     selectedPromptName === p.name
-                      ? (isDark ? 'bg-indigo-900/40 border border-indigo-500/40' : 'bg-indigo-50 border border-indigo-200')
-                      : (isDark ? 'hover:bg-gray-800 border border-transparent' : 'hover:bg-gray-100 border border-transparent')
-                  }`}
-                >
-                  <div className={`text-xs font-medium ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>{p.name}</div>
-                  <div className={`text-[10px] mt-0.5 truncate ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{p.content}</div>
-                </button>
+                      ? (isDark ? 'bg-indigo-900/40 border-indigo-500/40' : 'bg-indigo-50 border-indigo-200')
+                      : (isDark ? 'bg-gray-800/50 border-gray-700 hover:bg-gray-800' : 'bg-white border-gray-200 hover:bg-gray-50')
+                  }`}>
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => { loadPrompt(p._id); setShowPromptModal(false); }}>
+                        <div className={`text-xs font-medium ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>{p.name}</div>
+                        <div className={`text-[10px] mt-0.5 line-clamp-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{p.content}</div>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <button onClick={() => startEditPrompt(p)} className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`} title="Edit">✏️</button>
+                        <button onClick={() => deletePrompt(p._id)} className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'text-gray-500 hover:text-red-400' : 'text-gray-400 hover:text-red-500'}`} title="Delete">🗑️</button>
+                      </div>
+                    </div>
+                  </div>
+                )
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setDeleteConfirmId(null)}>
+          <div className="absolute inset-0 bg-black/60" />
+          <div className={`relative w-full max-w-sm mx-4 rounded-lg border shadow-xl p-5 ${isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`} onClick={(e) => e.stopPropagation()}>
+            <h3 className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>Delete Thread</h3>
+            <p className={`text-xs mb-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>This will permanently delete this thread and all its messages. This cannot be undone.</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setDeleteConfirmId(null)} className={`text-xs px-3 py-1.5 rounded ${isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>Cancel</button>
+              <button onClick={() => deleteThread(deleteConfirmId)} className="text-xs px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-500">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showArchives && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setShowArchives(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className={`relative w-full max-w-lg mx-4 mb-16 rounded-lg border shadow-xl ${isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`} onClick={(e) => e.stopPropagation()}>
+            <div className={`flex justify-between items-center p-3 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+              <h3 className={`text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>Archived Threads</h3>
+              <button onClick={() => setShowArchives(false)} className={`text-xs px-2 py-1 rounded ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}></button>
+            </div>
+            <div className="p-3 max-h-80 overflow-y-auto space-y-1">
+              {archivedThreads.length === 0 ? (
+                <p className={`text-xs text-center py-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>No archived threads</p>
+              ) : (
+                archivedThreads.map(t => (
+                  <div key={t._id} className={`p-2.5 rounded-lg border flex justify-between items-center ${isDark ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => { loadThread(t._id); setShowArchives(false); }}>
+                      <div className={`text-xs font-medium truncate ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>{t.name}</div>
+                      <div className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{t.updatedAt ? formatDate(t.updatedAt) : ''}</div>
+                    </div>
+                    <div className="flex gap-1 shrink-0 ml-2">
+                      <button onClick={() => unarchiveThread(t._id)} className={`text-[10px] px-2 py-1 rounded ${isDark ? 'bg-indigo-900/40 text-indigo-300 hover:bg-indigo-900/60' : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'}`} title="Unarchive">📤 Unarchive</button>
+                      <button onClick={() => { setDeleteConfirmId(t._id); setShowArchives(false); }} className={`text-[10px] px-1.5 py-1 rounded ${isDark ? 'text-gray-500 hover:text-red-400' : 'text-gray-400 hover:text-red-500'}`} title="Delete">🗑️</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAbout && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowAbout(false)}>
+          <div className="absolute inset-0 bg-black/60" />
+          <div className={`relative w-full max-w-lg mx-4 rounded-lg border shadow-xl max-h-[85vh] flex flex-col ${isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`} onClick={(e) => e.stopPropagation()}>
+            <div className={`flex justify-between items-center p-4 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+              <div>
+                <h3 className={`text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>About Unified Chat Hub</h3>
+                <p className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Version {APP_VERSION}</p>
+              </div>
+              <button onClick={() => setShowAbout(false)} className={`text-xs px-2 py-1 rounded ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}></button>
+            </div>
+            <div className={`p-4 overflow-y-auto flex-1 text-xs ${isDark ? 'text-gray-300' : 'text-gray-700'} prose prose-sm max-w-none ${isDark ? 'prose-invert' : ''} prose-headings:text-sm prose-p:text-xs prose-ul:text-xs prose-strong:text-white`}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{aboutContent || 'Loading...'}</ReactMarkdown>
+            </div>
+            <div className={`p-4 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+              <p className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                By Jorge Pereira (35sites.com LLC) · <a href="https://35sites.com" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300">35sites.com</a>
+              </p>
             </div>
           </div>
         </div>

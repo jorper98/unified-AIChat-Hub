@@ -133,7 +133,7 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
                         <td className="py-2 text-gray-300">{m.modelName}</td>
                         <td className="py-2 text-right text-gray-500 font-mono">{formatTokenCount(m.inputTokens)}</td>
                         <td className="py-2 text-right text-gray-500 font-mono">{formatTokenCount(m.outputTokens)}</td>
-                        <td className="py-2 text-right font-mono text-green-400">${m.totalCost.toFixed(4)}</td>
+                        <td className="py-2 text-right font-mono text-green-400">${m.totalCost.toFixed(6)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -142,7 +142,7 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
                       <td className="py-2 text-gray-200 font-semibold">Total</td>
                       <td className="py-2"></td>
                       <td className="py-2"></td>
-                      <td className="py-2 text-right font-mono text-green-400 font-semibold">${modelCosts.grandTotal.toFixed(4)}</td>
+                      <td className="py-2 text-right font-mono text-green-400 font-semibold">${modelCosts.grandTotal.toFixed(6)}</td>
                     </tr>
                   </tfoot>
             </table>
