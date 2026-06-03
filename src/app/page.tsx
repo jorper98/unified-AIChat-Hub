@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { MarkdownRenderer } from './components/MarkdownRenderer';
 
 interface ChatTurn {
   role: 'user' | 'assistant';
@@ -146,9 +147,9 @@ export default function UnifiedChatInterface() {
   return (
     <main className="flex h-screen bg-gray-900 text-gray-100 font-sans">
       {/* Control Panel Panel Sidebar Container */}
-      <section className="w-80 bg-gray-950 p-4 flex flex-col gap-4 border-r border-gray-800 h-full">
+      <section className="w-80 bg-gray-950 p-4 flex flex-col gap-4 border-r border-gray-800 h-full pb-8">
         <div className="flex justify-between items-center">
-          <h1 className="text-md font-bold text-indigo-400">Unified Hub</h1>
+          <h1 className="text-md font-bold text-indigo-400">Unified Chat Hub</h1>
           <Link href="/settings" className="text-xs text-gray-400 hover:text-white bg-gray-900 px-2 py-1 rounded border border-gray-800 transition">
             ⚙ Settings
           </Link>
@@ -220,7 +221,7 @@ export default function UnifiedChatInterface() {
       </section>
 
       {/* Primary Conversation Stream Panel */}
-      <section className="flex-1 flex flex-col h-full">
+      <section className="flex-1 flex flex-col h-full pb-8">
         <div className="flex-1 overflow-y-auto p-8 space-y-6">
           {messages.length === 0 ? (
             <div className="h-full flex items-center justify-center text-gray-500 text-sm">
@@ -232,7 +233,7 @@ export default function UnifiedChatInterface() {
                 <div className={`px-4 py-3 rounded-lg text-sm leading-relaxed ${
                   msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-gray-800 text-gray-200 rounded-bl-none'
                 }`}>
-                  {msg.content}
+                  <MarkdownRenderer content={msg.content} isUser={msg.role === 'user'} />
                 </div>
                 {msg.modelUsed && (
                   <span className="text-[10px] font-mono text-gray-500 px-1 mt-0.5">
@@ -269,6 +270,11 @@ export default function UnifiedChatInterface() {
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="fixed bottom-0 left-0 right-0 bg-gray-950 border-t border-gray-800 py-2 text-center text-[10px] text-gray-500">
+        By <a href="https://35sites.com/" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 transition">Jorge Pereira (35sites.com LLC)</a>
+      </footer>
     </main>
   );
 }

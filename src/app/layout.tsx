@@ -1,6 +1,6 @@
 import './globals.css';
 
-export const metadata = { title: 'Unified Multimodal Sandbox' };
+export const metadata = { title: 'Unified Chat Hub' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

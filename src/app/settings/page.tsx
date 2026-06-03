@@ -10,9 +10,9 @@ const ALL_MASTER_MODELS = [
   { id: 'deepseek/deepseek-chat', name: 'DeepSeek Chat (DeepSeek)' },
   { id: 'google/gemini-pro', name: 'Gemini Pro (Google)' },
   { id: 'google/gemini-flash-lite', name: 'Gemini Flash Lite (Google)' },
-  { id: 'qwen/qwen-2.5-72b-instruct', name: 'Qwen 2.5 72B (Alibaba)' },
-  { id: 'xiaomi/mimo-v2-pro', name: 'Mimo V2 Pro (Xiaomi)' },
-  { id: 'minimax/minimax-m2.7', name: 'MiniMax M2.7 (MiniMax)' },
+  { id: 'qwen/qwen3.6-plus', name: 'Qwen3.6-plus (Alibaba)' },
+  { id: 'x-ai/grok-4.3', name: 'x-ai/grok-4.3' },
+  { id: 'MiniMax: MiniMax M3', name: 'MiniMax M3 (MiniMax)' },
   { id: 'moonshot/kimi-k2', name: 'Kimi K2 (Moonshot)' }
 ];
 
