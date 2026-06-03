@@ -84,6 +84,7 @@ export default function UnifiedChatInterface() {
   const [showSavePrompt, setShowSavePrompt] = useState(false);
   const [promptName, setPromptName] = useState('');
   const [threadMetadata, setThreadMetadata] = useState<ThreadMetadata | null>(null);
+  const [showPromptModal, setShowPromptModal] = useState(false);
 
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
@@ -545,16 +546,15 @@ export default function UnifiedChatInterface() {
                   </div>
                 )}
                 {savedPrompts.length > 0 && (
-                  <select
-                    onChange={(e) => loadPrompt(e.target.value)}
-                    value=""
-                    className={`w-full border rounded px-1.5 py-1 text-xs focus:outline-none mb-1 ${isDark ? 'bg-gray-900 border-gray-700 text-gray-400' : 'bg-gray-100 border-gray-300 text-gray-600'}`}
+                  <button
+                    onClick={() => setShowPromptModal(true)}
+                    className={`w-full border rounded px-1.5 py-1 text-xs focus:outline-none mb-1 text-left flex justify-between items-center ${isDark ? 'bg-gray-900 border-gray-700 text-gray-400 hover:text-gray-200' : 'bg-gray-100 border-gray-300 text-gray-600 hover:text-gray-800'}`}
                   >
-                    <option value="">Load saved prompt...</option>
-                    {savedPrompts.map(p => (
-                      <option key={p._id} value={p._id} className="bg-gray-900 text-white">{p.name}</option>
-                    ))}
-                  </select>
+                    <span>📋 Load saved prompt...</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
                 )}
                 <textarea 
                   value={systemPrompt}
@@ -581,6 +581,37 @@ export default function UnifiedChatInterface() {
         isOpen={showRawData}
         onClose={() => setShowRawData(false)}
       />
+
+      {showPromptModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setShowPromptModal(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div 
+            className={`relative w-full max-w-lg mx-4 mb-16 rounded-lg border shadow-xl ${isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={`flex justify-between items-center p-3 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+              <h3 className={`text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>Load System Prompt</h3>
+              <button onClick={() => setShowPromptModal(false)} className={`text-xs px-2 py-1 rounded ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}></button>
+            </div>
+            <div className="p-2 max-h-60 overflow-y-auto">
+              {savedPrompts.map(p => (
+                <button
+                  key={p._id}
+                  onClick={() => { loadPrompt(p._id); setShowPromptModal(false); }}
+                  className={`w-full text-left p-2.5 rounded mb-1 transition ${
+                    selectedPromptName === p.name
+                      ? (isDark ? 'bg-indigo-900/40 border border-indigo-500/40' : 'bg-indigo-50 border border-indigo-200')
+                      : (isDark ? 'hover:bg-gray-800 border border-transparent' : 'hover:bg-gray-100 border border-transparent')
+                  }`}
+                >
+                  <div className={`text-xs font-medium ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>{p.name}</div>
+                  <div className={`text-[10px] mt-0.5 truncate ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{p.content}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
