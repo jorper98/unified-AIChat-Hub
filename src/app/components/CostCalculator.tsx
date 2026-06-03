@@ -11,6 +11,8 @@ interface Message {
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
+    imageTokens?: number;
+    actualCost?: number;
   };
 }
 
@@ -35,7 +37,7 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const modelCosts = useMemo(() => {
-    const modelUsage: Record<string, { inputTokens: number; outputTokens: number }> = {};
+    const modelUsage: Record<string, { inputTokens: number; outputTokens: number; imageTokens: number; actualCost: number }> = {};
 
     let cumulativeContext = 0;
 
@@ -47,12 +49,14 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
       } else if (msg.role === 'assistant' && msg.modelUsed) {
         const modelId = msg.modelUsed;
         if (!modelUsage[modelId]) {
-          modelUsage[modelId] = { inputTokens: 0, outputTokens: 0 };
+          modelUsage[modelId] = { inputTokens: 0, outputTokens: 0, imageTokens: 0, actualCost: 0 };
         }
 
         if (msg.usage && msg.usage.promptTokens > 0) {
           modelUsage[modelId].inputTokens += msg.usage.promptTokens;
           modelUsage[modelId].outputTokens += msg.usage.completionTokens || 0;
+          modelUsage[modelId].imageTokens += msg.usage.imageTokens || 0;
+          modelUsage[modelId].actualCost += msg.usage.actualCost || 0;
         } else {
           modelUsage[modelId].inputTokens += cumulativeContext;
           modelUsage[modelId].outputTokens += msgTokens;
@@ -66,30 +70,34 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
       modelName: string;
       inputTokens: number;
       outputTokens: number;
+      imageTokens: number;
       inputCost: number;
       outputCost: number;
       totalCost: number;
+      hasActualCost: boolean;
     }> = [];
 
     let grandTotal = 0;
 
     for (const [modelId, usage] of Object.entries(modelUsage)) {
       const pricing = MODEL_PRICING[modelId];
-      if (!pricing) continue;
+      const modelName = pricing?.name || modelId.split('/')[1] || modelId;
 
-      const inputCost = (usage.inputTokens / 1_000_000) * pricing.input;
-      const outputCost = (usage.outputTokens / 1_000_000) * pricing.output;
-      const totalCost = inputCost + outputCost;
+      const inputCost = pricing ? (usage.inputTokens / 1_000_000) * pricing.input : 0;
+      const outputCost = pricing ? (usage.outputTokens / 1_000_000) * pricing.output : 0;
+      const totalCost = usage.actualCost > 0 ? usage.actualCost : inputCost + outputCost;
       grandTotal += totalCost;
 
       results.push({
         modelId,
-        modelName: pricing.name,
+        modelName,
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
+        imageTokens: usage.imageTokens,
         inputCost,
         outputCost,
         totalCost,
+        hasActualCost: usage.actualCost > 0,
       });
     }
 
@@ -124,15 +132,22 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
                       <th className="text-left py-2 font-medium">Model</th>
                       <th className="text-right py-2 font-medium">In</th>
                       <th className="text-right py-2 font-medium">Out</th>
+                      <th className="text-right py-2 font-medium">Img</th>
                       <th className="text-right py-2 font-medium">Cost</th>
                     </tr>
                   </thead>
                   <tbody>
                     {modelCosts.models.map(m => (
                       <tr key={m.modelId} className="border-b border-gray-800">
-                        <td className="py-2 text-gray-300">{m.modelName}</td>
+                        <td className="py-2 text-gray-300">
+                          {m.modelName}
+                          {m.hasActualCost && (
+                            <span className="text-[9px] text-indigo-400 ml-1" title="Actual cost from OpenRouter">*</span>
+                          )}
+                        </td>
                         <td className="py-2 text-right text-gray-500 font-mono">{formatTokenCount(m.inputTokens)}</td>
                         <td className="py-2 text-right text-gray-500 font-mono">{formatTokenCount(m.outputTokens)}</td>
+                        <td className="py-2 text-right text-gray-500 font-mono">{m.imageTokens > 0 ? formatTokenCount(m.imageTokens) : '—'}</td>
                         <td className="py-2 text-right font-mono text-green-400">${m.totalCost.toFixed(6)}</td>
                       </tr>
                     ))}
@@ -142,13 +157,14 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
                       <td className="py-2 text-gray-200 font-semibold">Total</td>
                       <td className="py-2"></td>
                       <td className="py-2"></td>
+                      <td className="py-2"></td>
                       <td className="py-2 text-right font-mono text-green-400 font-semibold">${modelCosts.grandTotal.toFixed(6)}</td>
                     </tr>
                   </tfoot>
             </table>
 
             <p className="text-[9px] text-gray-600 mt-3 italic">
-              * Uses actual OpenRouter usage data when available, estimates for older messages. Prices per 1M tokens.
+              * Actual cost from OpenRouter (includes image tokens). Prices per 1M tokens.
             </p>
           </div>
         </div>

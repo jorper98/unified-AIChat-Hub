@@ -84,6 +84,10 @@ export default function SettingsPage() {
   const [fetchingModels, setFetchingModels] = useState(false);
   const [darkColors, setDarkColors] = useState<ThemeColors>(DEFAULT_DARK);
   const [lightColors, setLightColors] = useState<ThemeColors>(DEFAULT_LIGHT);
+  const [modelSearchQuery, setModelSearchQuery] = useState('');
+  const [selectedProviderFilters, setSelectedProviderFilters] = useState<Set<string>>(new Set());
+  const [validationResults, setValidationResults] = useState<Record<string, { valid: boolean; message: string }>>({});
+  const [validatingId, setValidatingId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -260,12 +264,116 @@ export default function SettingsPage() {
 
   const customProviders = providers.filter(p => p.id !== 'openrouter');
 
+  const filteredModels = models.filter(m => {
+    const matchesSearch = modelSearchQuery === '' ||
+      m.name.toLowerCase().includes(modelSearchQuery.toLowerCase()) ||
+      m.id.toLowerCase().includes(modelSearchQuery.toLowerCase());
+    const matchesProvider = selectedProviderFilters.size === 0 ||
+      selectedProviderFilters.has(m.provider);
+    return matchesSearch && matchesProvider;
+  });
+
   const groupedModels = models.reduce((acc: Record<string, Model[]>, model) => {
     const provider = model.provider || 'openrouter';
     if (!acc[provider]) acc[provider] = [];
     acc[provider].push(model);
     return acc;
   }, {});
+
+  const filteredGroupedModels = filteredModels.reduce((acc: Record<string, Model[]>, model) => {
+    const provider = model.provider || 'openrouter';
+    if (!acc[provider]) acc[provider] = [];
+    acc[provider].push(model);
+    return acc;
+  }, {});
+
+  const uniqueModelProviders = Array.from(new Set(models.map(m => m.provider)));
+
+  const toggleProviderFilter = (providerId: string) => {
+    setSelectedProviderFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(providerId)) {
+        next.delete(providerId);
+      } else {
+        next.add(providerId);
+      }
+      return next;
+    });
+  };
+
+  const clearFilters = () => {
+    setModelSearchQuery('');
+    setSelectedProviderFilters(new Set());
+  };
+
+  const validateModelId = async (model: Model) => {
+    setValidatingId(model.id);
+    try {
+      if (model.provider === 'openrouter') {
+        const res = await fetch('https://openrouter.ai/api/v1/models');
+        const data = await res.json();
+        const validIds = new Set(data.data?.map((m: any) => m.id) || []);
+        const isValid = validIds.has(model.id);
+        setValidationResults(prev => ({
+          ...prev,
+          [model.id]: { valid: isValid, message: isValid ? 'Valid' : 'Not found on OpenRouter' }
+        }));
+      } else {
+        const provider = providers.find(p => p.id === model.provider);
+        if (provider?.endpoint) {
+          let url = provider.endpoint;
+          if (provider.id === 'ollama') {
+            url = provider.endpoint.replace('/api/chat', '/api/tags');
+          } else if (provider.id === 'llm-studio' || provider.id === 'openai-local') {
+            url = provider.endpoint.replace('/v1/chat/completions', '/v1/models');
+          }
+          const res = await fetch(url);
+          const data = await res.json();
+          let modelNames: string[] = [];
+          if (provider.id === 'ollama') {
+            modelNames = data.models?.map((m: any) => m.name) || [];
+          } else {
+            modelNames = data.data?.map((m: any) => m.id) || [];
+          }
+          const isValid = modelNames.includes(model.id);
+          setValidationResults(prev => ({
+            ...prev,
+            [model.id]: { valid: isValid, message: isValid ? 'Valid' : `Not found on ${provider.name}` }
+          }));
+        } else {
+          setValidationResults(prev => ({
+            ...prev,
+            [model.id]: { valid: false, message: 'No endpoint configured' }
+          }));
+        }
+      }
+    } catch (e: any) {
+      setValidationResults(prev => ({
+        ...prev,
+        [model.id]: { valid: false, message: `Connection failed: ${e.message}` }
+      }));
+    } finally {
+      setValidatingId(null);
+    }
+  };
+
+  const validateAll = async () => {
+    setValidatingAll(true);
+    for (const model of models) {
+      await validateModelId(model);
+    }
+    setValidatingAll(false);
+  };
+
+  const moveModel = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    setModels(prev => {
+      const updated = [...prev];
+      const [moved] = updated.splice(fromIndex, 1);
+      updated.splice(toIndex, 0, moved);
+      return updated;
+    });
+  };
 
   const navItems: { id: SettingsSection; label: string; icon: string }[] = [
     { id: 'models', label: 'Models', icon: '' },
@@ -329,38 +437,180 @@ export default function SettingsPage() {
               <>
                 <h1 className="text-2xl font-bold text-indigo-400">Model Configuration</h1>
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-gray-500">{models.length} models across {providers.length} providers</span>
-                  <button onClick={() => setShowAddModal(true)} className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded transition">+ Add Model</button>
+                  <span className="text-xs text-gray-500">
+                    {filteredModels.length === models.length
+                      ? `${models.length} models across ${providers.length} providers`
+                      : `Showing ${filteredModels.length} of ${models.length} models`}
+                  </span>
+                  <div className="flex gap-2">
+                    <button onClick={validateAll} disabled={validatingAll} className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded transition disabled:opacity-50">
+                      {validatingAll ? 'Checking...' : 'Check All'}
+                    </button>
+                    <button onClick={() => setShowAddModal(true)} className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded transition">+ Add Model</button>
+                  </div>
                 </div>
 
-                {Object.entries(groupedModels).map(([providerId, providerModels]) => (
-                  <div key={providerId} className="border border-gray-800 rounded-lg overflow-hidden">
-                    <div className="px-4 py-2 text-xs font-semibold uppercase tracking-wider bg-gray-800 text-gray-400">
-                      {getProviderName(providerId)} ({providerModels.length} models)
-                    </div>
-                    <div className="p-4 space-y-2 bg-gray-950">
-                      {providerModels.map((m) => {
-                        const globalIndex = models.findIndex(model => model.id === m.id);
-                        return (
-                          <div key={m.id} className="flex items-center justify-between p-3 rounded border bg-gray-900/50 border-gray-800/60 transition">
-                            <div className="flex-1 min-w-0">
-                              <span className="text-sm block truncate text-gray-100">{m.name}</span>
-                              <span className="text-[10px] font-mono text-gray-500">{m.id}</span>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0 ml-2">
-                              <button onClick={() => { setEditingModel(m); setModelId(m.id); setModelName(m.name); setModelProvider(m.provider); setShowAddModal(true); }} className="text-xs px-1.5 py-1 rounded text-gray-500 hover:text-indigo-400 transition">Edit</button>
-                              <button onClick={() => deleteModel(m.id)} className="text-xs px-1.5 py-1 rounded text-gray-500 hover:text-red-400 transition">Del</button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                <div className="space-y-3">
+                  <div className="relative">
+                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input
+                      type="text"
+                      value={modelSearchQuery}
+                      onChange={(e) => setModelSearchQuery(e.target.value)}
+                      placeholder="Search models by name or ID..."
+                      className="w-full bg-gray-950 border border-gray-800 rounded-lg pl-9 pr-4 py-2 text-xs text-gray-100 placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition"
+                    />
+                    {modelSearchQuery && (
+                      <button
+                        onClick={() => setModelSearchQuery('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
-                ))}
+
+                  {uniqueModelProviders.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Filter by Provider</span>
+                        {selectedProviderFilters.size > 0 && (
+                          <button onClick={clearFilters} className="text-[10px] text-indigo-400 hover:text-indigo-300 transition">
+                            Clear filters
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {uniqueModelProviders.map(pid => {
+                          const isActive = selectedProviderFilters.size === 0 || selectedProviderFilters.has(pid);
+                          const providerCount = models.filter(m => m.provider === pid).length;
+                          return (
+                            <button
+                              key={pid}
+                              onClick={() => toggleProviderFilter(pid)}
+                              className={`text-[10px] px-2 py-1 rounded-full border transition ${
+                                isActive
+                                  ? 'bg-indigo-900/40 text-indigo-300 border-indigo-500/40'
+                                  : 'bg-gray-900 text-gray-500 border-gray-700 hover:border-gray-600'
+                              }`}
+                            >
+                              {getProviderName(pid)} ({providerCount})
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {filteredModels.length > 0 && (
+                  <div className="border border-gray-800 rounded-lg overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-gray-800 text-gray-400">
+                          <th className="text-left py-2 px-3 w-8"></th>
+                          <th className="text-left py-2 px-3">Display Name</th>
+                          <th className="text-left py-2 px-3">Model ID</th>
+                          <th className="text-left py-2 px-3">Provider</th>
+                          <th className="text-center py-2 px-3 w-24">Status</th>
+                          <th className="text-center py-2 px-3 w-28">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredModels.map((m, index) => {
+                          const validationResult = validationResults[m.id];
+                          const isValidating = validatingId === m.id;
+                          const isInvalid = validationResult && !validationResult.valid;
+                          const isValid = validationResult && validationResult.valid;
+                          return (
+                            <tr
+                              key={m.id}
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer.effectAllowed = 'move';
+                                e.dataTransfer.setData('text/plain', String(index));
+                              }}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = 'move';
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+                                moveModel(fromIndex, index);
+                              }}
+                              className={`border-t border-gray-800 transition ${
+                                draggedIndex === index ? 'bg-indigo-900/20' : 'bg-gray-950 hover:bg-gray-900'
+                              }`}
+                            >
+                              <td className="py-2 px-3 cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                                </svg>
+                              </td>
+                              <td className={`py-2 px-3 ${isInvalid ? 'text-red-400' : 'text-gray-100'}`}>{m.name}</td>
+                              <td className={`py-2 px-3 font-mono ${isInvalid ? 'text-red-400' : 'text-gray-500'}`}>
+                                {m.id}
+                                {isInvalid && (
+                                  <span className="text-[9px] ml-1" title={validationResult.message}>⚠</span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 text-gray-400">{getProviderName(m.provider)}</td>
+                              <td className="py-2 px-3 text-center">
+                                {isValidating ? (
+                                  <span className="text-indigo-400 animate-pulse">...</span>
+                                ) : isValid ? (
+                                  <span className="text-green-400" title={validationResult.message}>✓</span>
+                                ) : isInvalid ? (
+                                  <span className="text-red-400" title={validationResult.message}></span>
+                                ) : (
+                                  <span className="text-gray-600">—</span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    onClick={() => validateModelId(m)}
+                                    disabled={isValidating}
+                                    className="text-[10px] px-1.5 py-1 rounded text-gray-500 hover:text-indigo-400 transition disabled:opacity-50"
+                                    title="Check model ID"
+                                  >
+                                    {isValidating ? '...' : 'Check'}
+                                  </button>
+                                  <button
+                                    onClick={() => { setEditingModel(m); setModelId(m.id); setModelName(m.name); setModelProvider(m.provider); setShowAddModal(true); }}
+                                    className="text-[10px] px-1.5 py-1 rounded text-gray-500 hover:text-indigo-400 transition"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => deleteModel(m.id)}
+                                    className="text-[10px] px-1.5 py-1 rounded text-gray-500 hover:text-red-400 transition"
+                                  >
+                                    Del
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
                 {models.length === 0 && (
                   <div className="border border-gray-800 rounded-lg p-4 text-center bg-gray-950">
                     <p className="text-sm text-gray-500">No models configured.</p>
+                  </div>
+                )}
+
+                {models.length > 0 && filteredModels.length === 0 && (
+                  <div className="border border-gray-800 rounded-lg p-4 text-center bg-gray-950">
+                    <p className="text-sm text-gray-500">No models match your filters.</p>
+                    <button onClick={clearFilters} className="text-xs text-indigo-400 hover:text-indigo-300 mt-1 transition">Clear filters</button>
                   </div>
                 )}
               </>

@@ -21,6 +21,8 @@ interface ChatTurn {
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
+    imageTokens?: number;
+    actualCost?: number;
   };
 }
 
@@ -118,26 +120,35 @@ export default function UnifiedChatInterface() {
         const modelList = data.models || data.selectedModels || [];
         const formatted = modelList.map((m: any) => ({
           id: typeof m === 'string' ? m : m.id,
-          name: typeof m === 'string' ? (MASTER_NAME_MAP[m] || m) : m.name
+          name: typeof m === 'string' ? (MASTER_NAME_MAP[m] || m) : m.name,
+          provider: typeof m === 'string' ? 'openrouter' : (m.provider || 'openrouter')
         }));
-        // Filter against OpenRouter to remove invalid model IDs
-        fetch('https://openrouter.ai/api/v1/models')
-          .then(res => res.json())
-          .then(apiData => {
-            const validIds = new Set(apiData.data?.map((m: any) => m.id) || []);
-            const validModels = formatted.filter(m => validIds.has(m.id));
-            if (validModels.length > 0) {
-              setAvailableModels(validModels);
-              setModel(validModels[0].id);
-            }
-          })
-          .catch(() => {
-            // If OpenRouter is unreachable, use all models
-            if (formatted.length > 0) {
-              setAvailableModels(formatted);
-              setModel(formatted[0].id);
-            }
-          });
+
+        const openRouterModels = formatted.filter((m: any) => m.provider === 'openrouter');
+        const otherModels = formatted.filter((m: any) => m.provider !== 'openrouter');
+
+        const processModels = (validatedOpenRouterModels: DropdownModel[]) => {
+          const allModels = [...validatedOpenRouterModels, ...otherModels];
+          if (allModels.length > 0) {
+            setAvailableModels(allModels);
+            setModel(allModels[0].id);
+          }
+        };
+
+        if (openRouterModels.length > 0) {
+          fetch('https://openrouter.ai/api/v1/models')
+            .then(res => res.json())
+            .then(apiData => {
+              const validIds = new Set(apiData.data?.map((m: any) => m.id) || []);
+              const validModels = openRouterModels.filter((m: any) => validIds.has(m.id));
+              processModels(validModels);
+            })
+            .catch(() => {
+              processModels(openRouterModels);
+            });
+        } else {
+          processModels([]);
+        }
       });
     fetch('/api/prompts')
       .then(res => res.json())
@@ -145,7 +156,6 @@ export default function UnifiedChatInterface() {
         if (data.prompts) setSavedPrompts(data.prompts);
       });
     refreshThreads();
-    // Load active thread if one is stored
     const savedThreadId = localStorage.getItem('activeThreadId');
     if (savedThreadId) {
       loadThread(savedThreadId);
