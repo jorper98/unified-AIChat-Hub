@@ -58,7 +58,7 @@ const DEFAULT_LIGHT: ThemeColors = {
   borderAlt: '#d1d5db'
 };
 
-type SettingsSection = 'models' | 'providers' | 'theme' | 'backup';
+type SettingsSection = 'models' | 'providers' | 'theme' | 'backup' | 'global-prompt';
 
 export default function SettingsPage() {
   const [models, setModels] = useState<Model[]>([]);
@@ -92,6 +92,7 @@ export default function SettingsPage() {
   const [restoring, setRestoring] = useState(false);
   const [restoreMode, setRestoreMode] = useState<'replace' | 'merge'>('replace');
   const [restoreResult, setRestoreResult] = useState<{ success: boolean; message: string; details?: any } | null>(null);
+  const [globalSystemPrompt, setGlobalSystemPrompt] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -140,6 +141,7 @@ export default function SettingsPage() {
           if (data.themeColors.dark) setDarkColors(data.themeColors.dark);
           if (data.themeColors.light) setLightColors(data.themeColors.light);
         }
+        if (data.globalSystemPrompt !== undefined) setGlobalSystemPrompt(data.globalSystemPrompt || '');
       });
   }, []);
 
@@ -257,7 +259,8 @@ export default function SettingsPage() {
         models,
         providers,
         theme,
-        themeColors: { dark: darkColors, light: lightColors }
+        themeColors: { dark: darkColors, light: lightColors },
+        globalSystemPrompt
       })
     });
     setSaving(false);
@@ -431,6 +434,7 @@ export default function SettingsPage() {
     { id: 'models', label: 'Models', icon: '' },
     { id: 'providers', label: 'Providers', icon: '' },
     { id: 'theme', label: 'Theme Colors', icon: '' },
+    { id: 'global-prompt', label: 'Global System Prompt', icon: '🌍' },
     { id: 'backup', label: 'Backup & Restore', icon: '' }
   ];
 
@@ -802,6 +806,43 @@ export default function SettingsPage() {
                 <div className={`p-4 rounded-lg border ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-100 border-gray-200'}`}>
                   <p className="text-xs text-gray-400">
                     <strong>Tip:</strong> Click the color picker or type a hex value (e.g., #1f2937). Changes apply live. Click Save Settings to persist.
+                  </p>
+                </div>
+              </>
+            )}
+
+            {activeSection === 'global-prompt' && (
+              <>
+                <h1 className="text-2xl font-bold text-indigo-400">Global System Prompt</h1>
+                <p className="text-sm text-gray-400">
+                  This prompt is injected into EVERY chat session. Date and time are always included. Weather is fetched on-demand when you ask about it.
+                </p>
+
+                <div className="border border-gray-800 rounded-lg p-4 bg-gray-950">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
+                    Automatically Injected Context
+                  </h3>
+                  <p className="text-xs text-gray-300 font-mono">
+                    Current date and time: {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                  </p>
+                  <p className="text-xs text-gray-300 font-mono mt-1">
+                    Weather: fetched on-demand when you ask &quot;what&apos;s the weather in [location]&quot;
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 block mb-2">
+                    Your Global Instructions
+                  </label>
+                  <textarea
+                    value={globalSystemPrompt}
+                    onChange={(e) => setGlobalSystemPrompt(e.target.value)}
+                    rows={8}
+                    className="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 text-xs text-gray-100 focus:outline-none focus:border-indigo-500 resize-none"
+                    placeholder="e.g., Always respond in markdown format. You are a helpful assistant for Jorge Pereira at 35sites.com LLC..."
+                  />
+                  <p className="text-[10px] text-gray-600 mt-1">
+                    This text is appended after the automatic date/time/weather context. Leave empty to only inject dynamic context.
                   </p>
                 </div>
               </>

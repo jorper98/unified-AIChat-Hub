@@ -7,12 +7,15 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   modelUsed?: string;
+  perplexityUsed?: boolean;
   usage?: {
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
     imageTokens?: number;
     actualCost?: number;
+    perplexityTokens?: number;
+    perplexityCost?: number;
   };
 }
 
@@ -38,6 +41,10 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
 
   const modelCosts = useMemo(() => {
     const modelUsage: Record<string, { inputTokens: number; outputTokens: number; imageTokens: number; actualCost: number }> = {};
+    let perplexityInputTokens = 0;
+    let perplexityOutputTokens = 0;
+    let perplexityTotalCost = 0;
+    let perplexityCount = 0;
 
     let cumulativeContext = 0;
 
@@ -62,8 +69,19 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
           modelUsage[modelId].outputTokens += msgTokens;
         }
         cumulativeContext += msgTokens;
+
+        // Track Perplexity usage separately
+        if (msg.perplexityUsed && msg.usage?.perplexityCost && msg.usage.perplexityCost > 0) {
+          perplexityOutputTokens += msg.usage.perplexityTokens || 0;
+          perplexityTotalCost += msg.usage.perplexityCost || 0;
+          perplexityCount++;
+        }
       }
     }
+
+    // Perplexity Sonar via OpenRouter pricing: $1/1M input, $1/1M output
+    const perplexityInputCost = (perplexityInputTokens / 1_000_000) * 1.0;
+    const perplexityOutputCost = (perplexityOutputTokens / 1_000_000) * 1.0;
 
     const results: Array<{
       modelId: string;
@@ -98,6 +116,22 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
         outputCost,
         totalCost,
         hasActualCost: usage.actualCost > 0,
+      });
+    }
+
+    // Add Perplexity row if used
+    if (perplexityCount > 0) {
+      grandTotal += perplexityTotalCost;
+      results.push({
+        modelId: 'perplexity/sonar',
+        modelName: `Perplexity Sonar (${perplexityCount}×)`,
+        inputTokens: perplexityInputTokens,
+        outputTokens: perplexityOutputTokens,
+        imageTokens: 0,
+        inputCost: perplexityInputCost,
+        outputCost: perplexityOutputCost,
+        totalCost: perplexityTotalCost,
+        hasActualCost: true,
       });
     }
 

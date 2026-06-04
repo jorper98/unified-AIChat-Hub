@@ -8,7 +8,7 @@ This workspace securely anchors conversational prompt stream history and configu
 
 # Release Information
 
-**Current Sandbox Tracking Release:** `v0.1.1`
+**Current Sandbox Tracking Release:** `v0.1.5`
 ---
 
 ## Key Architecture & Features
@@ -37,7 +37,7 @@ Real-time keyword filtering across your database cluster, enabling instant searc
 Full data backup and restore via Settings → Backup & Restore panel. Exports a ZIP file containing:
 
 **Backup Contents:**
-- `data.json` — All database collections (threads, messages, model settings, saved prompts, theme colors)
+- `data.json` — All database collections (threads, messages, model settings, saved prompts, theme colors, global system prompt)
 - `images/` — All generated images from `public/images/` folder
 
 **Restore Process:**
@@ -47,6 +47,22 @@ Full data backup and restore via Settings → Backup & Restore panel. Exports a 
    - **Merge Only** — Skips items that already exist (by ID), only adds new ones
 3. Select the backup ZIP file — data and images are restored automatically
 4. The page reloads to reflect the restored data
+
+### 🌍 Global System Prompt & Dynamic Context
+A system-wide prompt injected into EVERY chat session, separate from per-thread instructions:
+- Set custom global instructions in Settings → Global System Prompt
+- Current date/time is automatically injected (timezone-aware via `TIMEZONE` env var)
+- Weather is fetched on-demand when you ask about it (via `WEATHER_LOCATION` env var, uses wttr.in)
+- Both apply to all models and all conversations
+
+### 🔍 Perplexity Sonar Fallback & Auto-Continue
+When the model expresses uncertainty ("I don't know", "I can't access", etc.), Perplexity Sonar is automatically queried via OpenRouter:
+- **Automatic fallback** — 35 uncertainty patterns detected, Perplexity answers replace the uncertain response
+- **Recheck trigger** — Say "recheck with Perplexity", "ask Perplexity", "search the web", etc. to force a Perplexity lookup
+- **Auto-continue mode** — After a recheck, follow-ups automatically go through Perplexity with full conversation history
+- **Exit mode** — Say "switch back", "exit perplexity", "back to normal" to return to the regular model
+- **Cost tracking** — Perplexity usage shown as a separate row in the CostCalculator ($)
+- No separate API key needed — uses your existing `OPENROUTER_API_KEY`
 
 ### 📦 Automated Sandbox Backup Daemon
 An isolated secondary database container automatically performs `mongodump` snapshot extractions every 24 hours and stores them on the host disk under:
@@ -74,6 +90,7 @@ An isolated secondary database container automatically performs `mongodump` snap
 ```text
 unified-chat/
 ├── .env                              # Local API tokens & connection strings
+├── .env.sample                       # Template with all configurable variables
 ├── Dockerfile                        # Single-stage Node compiler engine
 ├── docker-compose.yml                # Multi-container service definitions
 ├── package.json                      # Runtime dependencies
@@ -83,16 +100,25 @@ unified-chat/
 ├── README.md                         # Project documentation
 └── src/
     ├── lib/
-    │   └── db.ts                     # MongoDB connection pool manager
+    │   ├── db.ts                     # MongoDB connection pool manager
+    │   ├── context.ts                # Dynamic context builder (date/time/weather)
+    │   ├── perplexity.ts             # Perplexity fallback/recheck utility
+    │   └── tokens.ts                 # Token estimation & formatting utilities
+    ├── config/
+    │   └── models.json               # Default model catalog & provider config
     └── app/
         ├── globals.css               # Tailwind CSS bindings
         ├── layout.tsx                # Global HTML layout shell
         ├── page.tsx                  # Main chat workspace interface
         ├── settings/
         │   └── page.tsx              # Configuration dashboard
+        ├── components/
+        │   ├── CostCalculator.tsx    # Thread cost breakdown modal
+        │   ├── MarkdownRenderer.tsx  # Markdown rendering with code highlighting
+        │   └── RawDataModal.tsx      # Raw data inspection modal
         └── api/
-            ├── chat/                 # OpenRouter routing endpoint
-            ├── settings/             # Persist dropdown settings
+            ├── chat/                 # OpenRouter routing endpoint + Perplexity fallback
+            ├── settings/             # Persist dropdown settings + global system prompt
             ├── threads/              # Sidebar listings & search
             └── threads/[id]/messages/
                                         # Historical message loading
@@ -109,6 +135,16 @@ Create a `.env` file in the project root:
 ```env
 OPENROUTER_API_KEY=sk-or-v1-your_actual_token_string_here
 MONGODB_URI=mongodb://mongo_db:27017/chathub
+
+# Timezone for date/time display (IANA format)
+TIMEZONE=America/Phoenix
+
+# Location for weather injection (city name, zip code, or coordinates)
+# Leave empty to disable weather. You can ask about any location: "weather in Paris"
+WEATHER_LOCATION=Phoenix, AZ
+
+# Perplexity via OpenRouter - no separate API key needed!
+# Uses your existing OPENROUTER_API_KEY with model: perplexity/sonar
 ```
 
 ---

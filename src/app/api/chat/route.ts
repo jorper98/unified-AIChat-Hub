@@ -4,6 +4,8 @@ import { ObjectId } from 'mongodb';
 import modelConfig from '@/config/models.json';
 import fs from 'fs';
 import path from 'path';
+import { buildSystemContext } from '@/lib/context';
+import { isUncertainResponse, isPerplexityRecheck, isExitPerplexityMode, queryPerplexity } from '@/lib/perplexity';
 
 const IMAGES_DIR = path.join(process.cwd(), 'public', 'images');
 
@@ -170,14 +172,98 @@ export async function POST(request: Request) {
       content: msg.content
     }));
 
+    const dynamicContext = await buildSystemContext(messageContent);
+
+    const settings = await db.collection('settings').findOne({ _id: 'global_settings' as any });
+    const globalPrompt = settings?.globalSystemPrompt || '';
+
+    if (dynamicContext || globalPrompt) {
+      let globalMessage = '';
+      if (dynamicContext) {
+        globalMessage += dynamicContext + '\n\n';
+      }
+      if (globalPrompt) {
+        globalMessage += globalPrompt;
+      }
+      formattedHistory.unshift({ role: 'system', content: globalMessage.trim() });
+    }
+
     if (systemInstruction) {
       formattedHistory.unshift({ role: 'system', content: systemInstruction });
     }
 
-    let completionData: any;
-    let rawResponse: any = null;
+    // Check thread metadata for Perplexity auto-continue mode
+    const thread = await db.collection('threads').findOne({ _id: activeThreadId });
+    const inPerplexityMode = thread?.perplexityMode === true;
+
+    // Check for exit Perplexity mode trigger
+    const exitingPerplexityMode = inPerplexityMode && isExitPerplexityMode(messageContent);
+    if (exitingPerplexityMode) {
+      console.log('[Perplexity Mode] Exit trigger detected, disabling Perplexity mode');
+      await db.collection('threads').updateOne(
+        { _id: activeThreadId },
+        { $set: { perplexityMode: false } }
+      );
+    }
+
+    // Check if user wants to recheck the last question via Perplexity
+    let skipModelCall = false;
+    let perplexityUsage = null;
     let aiTextOutput = "";
     let usage: any = {};
+
+    // Priority: exit trigger > auto-continue mode > recheck trigger > normal model
+    if (inPerplexityMode && !exitingPerplexityMode) {
+      // Auto-continue: send to Perplexity with conversation history
+      console.log('[Perplexity Mode] Active, sending to Perplexity');
+      const perplexityHistory = rawHistory
+        .filter(msg => msg.role === 'user' || msg.role === 'assistant')
+        .map(msg => ({ role: msg.role, content: msg.content }));
+      const perplexityResult = await queryPerplexity(messageContent, perplexityHistory);
+      if (perplexityResult) {
+        aiTextOutput = perplexityResult.answer;
+        perplexityUsage = {
+          promptTokens: perplexityResult.promptTokens,
+          completionTokens: perplexityResult.completionTokens,
+          totalTokens: perplexityResult.promptTokens + perplexityResult.completionTokens,
+          actualCost: perplexityResult.cost,
+        };
+        skipModelCall = true;
+      }
+    } else if (isPerplexityRecheck(messageContent)) {
+      console.log('[Perplexity Recheck] Recheck request detected, finding previous user message...');
+      // Find the last user message before this current one
+      const userMessages = rawHistory.filter(msg => msg.role === 'user');
+      const previousUserMessage = userMessages.length > 1 ? userMessages[userMessages.length - 2] : null;
+
+      if (previousUserMessage) {
+        console.log(`[Perplexity Recheck] Running previous question through Perplexity: "${previousUserMessage.content.substring(0, 50)}..."`);
+        const perplexityResult = await queryPerplexity(previousUserMessage.content);
+        if (perplexityResult) {
+          aiTextOutput = perplexityResult.answer;
+          perplexityUsage = {
+            promptTokens: perplexityResult.promptTokens,
+            completionTokens: perplexityResult.completionTokens,
+            totalTokens: perplexityResult.promptTokens + perplexityResult.completionTokens,
+            actualCost: perplexityResult.cost,
+          };
+          skipModelCall = true;
+          // Enable Perplexity mode for follow-ups
+          await db.collection('threads').updateOne(
+            { _id: activeThreadId },
+            { $set: { perplexityMode: true } }
+          );
+          console.log('[Perplexity Recheck] Perplexity mode enabled for follow-ups');
+        }
+      } else {
+        console.log('[Perplexity Recheck] No previous user message found');
+      }
+    }
+
+    let completionData: any;
+    let rawResponse: any = null;
+
+    if (!skipModelCall) {
 
     if (provider.type === 'local' || provider.id === 'ollama') {
       const response = await fetch(provider.endpoint, {
@@ -394,9 +480,27 @@ export async function POST(request: Request) {
 
       usage = completionData.usage || {};
     }
+    } // end if (!skipModelCall)
 
     // Extract and save any base64 images in the response, replace with markdown image links
     aiTextOutput = extractAndSaveImages(aiTextOutput);
+
+    // Check if the model expressed uncertainty — if so, query Perplexity for real-time info
+    // (skip if Perplexity was already used via recheck request)
+    if (!perplexityUsage && isUncertainResponse(aiTextOutput)) {
+      console.log('[Perplexity Fallback] Uncertainty detected in model response, querying Perplexity...');
+      const perplexityResult = await queryPerplexity(messageContent);
+      if (perplexityResult) {
+        aiTextOutput = perplexityResult.answer;
+        perplexityUsage = {
+          promptTokens: perplexityResult.promptTokens,
+          completionTokens: perplexityResult.completionTokens,
+          totalTokens: perplexityResult.promptTokens + perplexityResult.completionTokens,
+          actualCost: perplexityResult.cost,
+        };
+        console.log('[Perplexity Fallback] Replaced uncertain response with Perplexity answer');
+      }
+    }
 
     await db.collection('messages').insertOne({
       threadId: activeThreadId,
@@ -405,12 +509,15 @@ export async function POST(request: Request) {
       modelUsed: selectedModel,
       systemInstruction: systemInstruction || "You are a helpful assistant.",
       promptName: promptName || null,
+      perplexityUsed: perplexityUsage ? true : false,
       usage: {
         promptTokens: usage.promptTokens || usage.prompt_tokens || 0,
         completionTokens: usage.completionTokens || usage.completion_tokens || 0,
         totalTokens: usage.totalTokens || usage.total_tokens || 0,
         imageTokens: usage.completion_tokens_details?.image_tokens || 0,
-        actualCost: usage.cost || 0
+        actualCost: usage.cost || 0,
+        perplexityTokens: perplexityUsage?.totalTokens || 0,
+        perplexityCost: perplexityUsage?.actualCost || 0,
       },
       createdAt: new Date()
     });

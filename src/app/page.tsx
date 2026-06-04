@@ -9,7 +9,7 @@ import { CostCalculator } from './components/CostCalculator';
 import { RawDataModal } from './components/RawDataModal';
 import { estimateTokens, formatTokenCount, MODEL_CONTEXT_LIMITS, MODEL_PRICING } from '@/lib/tokens';
 
-const APP_VERSION = '0.1.1';
+const APP_VERSION = '0.1.5';
 
 interface ChatTurn {
   role: 'user' | 'assistant';
@@ -17,12 +17,15 @@ interface ChatTurn {
   modelUsed?: string;
   promptName?: string;
   systemInstruction?: string;
+  perplexityUsed?: boolean;
   usage?: {
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
     imageTokens?: number;
     actualCost?: number;
+    perplexityTokens?: number;
+    perplexityCost?: number;
   };
 }
 
@@ -96,6 +99,7 @@ export default function UnifiedChatInterface() {
   const [showRawData, setShowRawData] = useState(false);
   const [showSavePrompt, setShowSavePrompt] = useState(false);
   const [promptName, setPromptName] = useState('');
+  const [editingPrompt, setEditingPrompt] = useState<{ id: string; name: string; content: string } | null>(null);
   const [threadMetadata, setThreadMetadata] = useState<ThreadMetadata | null>(null);
   const [showPromptModal, setShowPromptModal] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -210,7 +214,8 @@ export default function UnifiedChatInterface() {
             modelUsed: m.modelUsed,
             usage: m.usage,
             systemInstruction: m.systemInstruction,
-            promptName: m.promptName
+            promptName: m.promptName,
+            perplexityUsed: m.perplexityUsed
           }));
           setMessages(mappedMessages);
           
