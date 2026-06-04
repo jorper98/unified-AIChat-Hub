@@ -20,7 +20,8 @@ export async function GET() {
       models: settings?.models || DEFAULT_MODELS,
       providers: settings?.providers || DEFAULT_PROVIDERS,
       theme: settings?.theme || 'dark',
-      themeColors: settings?.themeColors || null
+      themeColors: settings?.themeColors || null,
+      globalSystemPrompt: settings?.globalSystemPrompt || ''
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -29,7 +30,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { models, providers, theme, themeColors } = await request.json();
+    const { models, providers, theme, themeColors, globalSystemPrompt } = await request.json();
     const db = await getDb();
 
     const updateData: any = { updatedAt: new Date() };
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
     if (providers !== undefined) updateData.providers = providers;
     if (theme !== undefined) updateData.theme = theme;
     if (themeColors !== undefined) updateData.themeColors = themeColors;
+    if (globalSystemPrompt !== undefined) updateData.globalSystemPrompt = globalSystemPrompt;
 
     await db.collection('settings').updateOne(
       { _id: 'global_settings' as any },

@@ -1,5 +1,37 @@
 # Changelog
 
+## v0.1.5
+- Auto-continue Perplexity mode: after a recheck, follow-ups automatically go through Perplexity
+- Perplexity mode persists per-thread in MongoDB (survives page reloads)
+- Exit Perplexity mode with: "switch back", "exit perplexity", "stop perplexity", "back to normal", etc.
+- Perplexity follow-ups include full conversation history for context-aware responses
+- 12 exit trigger phrases detected
+- Fixed: userQuery not being added to Perplexity API messages array (caused 500 errors)
+
+## v0.1.4
+- Perplexity recheck trigger: say "recheck with Perplexity", "ask Perplexity", "use Perplexity", etc.
+- Recheck finds the PREVIOUS user question in thread history and runs it through Perplexity Sonar
+- Skips the normal model call when recheck is triggered (saves tokens and time)
+- 19 trigger phrases detected (recheck with/using, ask, use, try, search, look it up, etc.)
+- Cost tracking works for recheck requests (shown in CostCalculator)
+
+## v0.1.3
+- Perplexity API fallback: when the model expresses uncertainty, Perplexity Sonar is queried automatically via OpenRouter
+- No separate Perplexity API key needed — uses existing OPENROUTER_API_KEY
+- Real-time web search answers injected when the model says "I don't know" or similar
+- 35 uncertainty detection patterns (weather, real-time data, browsing, etc.)
+- 10-second timeout on Perplexity calls to avoid blocking responses
+- Falls back to original response if Perplexity fails
+- Perplexity cost tracking in CostCalculator: token usage and cost shown as separate row
+- Perplexity Sonar via OpenRouter pricing: $1/1M input tokens, $1/1M output tokens
+
+## v0.1.2
+- Global System Prompt feature: custom instructions injected into every chat session
+- Dynamic context injection: current date/time (timezone-aware) and weather (via wttr.in)
+- New settings section for managing global system prompt
+- Environment variables: TIMEZONE and WEATHER_LOCATION for context customization
+- Weather API with 3-second timeout (fails gracefully if unavailable)
+
 ## v0.1.1
 - Theme colors moved from localStorage to MongoDB for full backup/restore coverage
 - Backup ZIP now includes dark/light theme color configurations
