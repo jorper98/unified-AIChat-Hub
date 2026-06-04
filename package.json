@@ -1,6 +1,6 @@
 {
   "name": "unified-chat-hub",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3031",
@@ -10,7 +10,7 @@
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",
     "adm-zip": "^0.5.17",
-    "archiver": "^8.0.0",
+    "jszip": "^3.10.1",
     "mongodb": "^6.5.0",
     "next": "^14.1.4",
     "react": "^18.2.0",
@@ -21,7 +21,6 @@
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
-    "@types/archiver": "^7.0.0",
     "@types/node": "^20.11.30",
     "@types/react": "^18.2.70",
     "@types/react-dom": "^18.2.22",

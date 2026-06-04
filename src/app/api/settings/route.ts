@@ -18,7 +18,9 @@ export async function GET() {
     
     return NextResponse.json({
       models: settings?.models || DEFAULT_MODELS,
-      providers: settings?.providers || DEFAULT_PROVIDERS
+      providers: settings?.providers || DEFAULT_PROVIDERS,
+      theme: settings?.theme || 'dark',
+      themeColors: settings?.themeColors || null
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -27,12 +29,18 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { models, providers } = await request.json();
+    const { models, providers, theme, themeColors } = await request.json();
     const db = await getDb();
+
+    const updateData: any = { updatedAt: new Date() };
+    if (models !== undefined) updateData.models = models;
+    if (providers !== undefined) updateData.providers = providers;
+    if (theme !== undefined) updateData.theme = theme;
+    if (themeColors !== undefined) updateData.themeColors = themeColors;
 
     await db.collection('settings').updateOne(
       { _id: 'global_settings' as any },
-      { $set: { models, providers, updatedAt: new Date() } },
+      { $set: updateData },
       { upsert: true }
     );
 

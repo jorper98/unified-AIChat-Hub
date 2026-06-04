@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import archiver from 'archiver';
+import JSZip from 'jszip';
 import fs from 'fs';
 import path from 'path';
 
@@ -24,32 +24,26 @@ export async function GET() {
       }
     };
 
+    const zip = new JSZip();
+    zip.file('data.json', JSON.stringify(backup, null, 2));
+
     const imagesDir = path.join(process.cwd(), 'public', 'images');
-    const hasImages = fs.existsSync(imagesDir) && fs.readdirSync(imagesDir).length > 0;
-
-    const archive = (archiver as any)('zip', { zlib: { level: 9 } });
-    const chunks: Buffer[] = [];
-
-    archive.on('data', (chunk: Buffer) => chunks.push(chunk));
-    archive.on('error', (err: Error) => { throw err; });
-
-    archive.append(JSON.stringify(backup, null, 2), { name: 'data.json' });
-
-    if (hasImages) {
-      archive.directory(imagesDir, 'images');
+    if (fs.existsSync(imagesDir)) {
+      const files = fs.readdirSync(imagesDir);
+      const imagesFolder = zip.folder('images');
+      if (imagesFolder) {
+        for (const file of files) {
+          const filePath = path.join(imagesDir, file);
+          const content = fs.readFileSync(filePath);
+          imagesFolder.file(file, content);
+        }
+      }
     }
 
-    archive.finalize();
-
-    await new Promise((resolve, reject) => {
-      archive.on('end', resolve);
-      archive.on('error', reject);
-    });
-
-    const buffer = Buffer.concat(chunks);
+    const buffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 9 } });
     const filename = `unified-chat-backup-${Date.now()}.zip`;
 
-    return new NextResponse(buffer, {
+    return new NextResponse(buffer as unknown as BodyInit, {
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="${filename}"`,

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.1
+- Theme colors moved from localStorage to MongoDB for full backup/restore coverage
+- Backup ZIP now includes dark/light theme color configurations
+- Restore process now applies saved theme colors automatically
+
 ## v0.1.0
 - Text-to-image model support: automatic extraction from OpenRouter/Gemini API responses
 - Smart context optimization: base64 images saved to public/images/, replaced with lightweight markdown links

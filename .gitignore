@@ -13,3 +13,4 @@ backups/
 old-docker-compose - Copy.yml
 data/
 public/images/
+tsconfig.tsbuildinfo

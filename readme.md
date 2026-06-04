@@ -8,7 +8,7 @@ This workspace securely anchors conversational prompt stream history and configu
 
 # Release Information
 
-**Current Sandbox Tracking Release:** `v0.1.0`
+**Current Sandbox Tracking Release:** `v0.1.1`
 ---
 
 ## Key Architecture & Features
@@ -37,7 +37,7 @@ Real-time keyword filtering across your database cluster, enabling instant searc
 Full data backup and restore via Settings → Backup & Restore panel. Exports a ZIP file containing:
 
 **Backup Contents:**
-- `data.json` — All database collections (threads, messages, model settings, saved prompts)
+- `data.json` — All database collections (threads, messages, model settings, saved prompts, theme colors)
 - `images/` — All generated images from `public/images/` folder
 
 **Restore Process:**

@@ -97,12 +97,6 @@ export default function SettingsPage() {
     setMounted(true);
     const saved = localStorage.getItem('theme') as 'dark' | 'light' | null;
     if (saved) setTheme(saved);
-    
-    const savedDark = localStorage.getItem('theme-dark-colors');
-    if (savedDark) setDarkColors(JSON.parse(savedDark));
-    
-    const savedLight = localStorage.getItem('theme-light-colors');
-    if (savedLight) setLightColors(JSON.parse(savedLight));
   }, []);
 
   useEffect(() => {
@@ -141,6 +135,11 @@ export default function SettingsPage() {
         if (data.models) setModels(data.models);
         if (data.providers) setProviders(data.providers);
         else setProviders(modelConfig.providers.map((p: any) => ({ id: p.id, name: p.name, type: p.type, endpoint: p.endpoint })));
+        if (data.theme) setTheme(data.theme);
+        if (data.themeColors) {
+          if (data.themeColors.dark) setDarkColors(data.themeColors.dark);
+          if (data.themeColors.light) setLightColors(data.themeColors.light);
+        }
       });
   }, []);
 
@@ -249,13 +248,17 @@ export default function SettingsPage() {
 
   async function handleSave() {
     setSaving(true);
-    localStorage.setItem('theme-dark-colors', JSON.stringify(darkColors));
-    localStorage.setItem('theme-light-colors', JSON.stringify(lightColors));
+    localStorage.setItem('theme', theme);
     
     await fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ models, providers })
+      body: JSON.stringify({
+        models,
+        providers,
+        theme,
+        themeColors: { dark: darkColors, light: lightColors }
+      })
     });
     setSaving(false);
     alert('Settings saved successfully!');
