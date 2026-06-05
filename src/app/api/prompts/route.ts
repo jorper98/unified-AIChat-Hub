@@ -5,7 +5,7 @@ import { ObjectId } from 'mongodb';
 const MAX_PROMPT_NAME_LENGTH = 200;
 const MAX_PROMPT_CONTENT_LENGTH = 10000;
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const db = await getDb();
     const prompts = await db.collection('system_prompts')

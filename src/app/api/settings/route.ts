@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import modelConfig from '@/config/models.json';
+import { SettingsDocument } from '@/lib/types';
 
 const DEFAULT_PROVIDERS = modelConfig.providers.map((p: any) => ({ id: p.id, name: p.name, type: p.type }));
 const DEFAULT_MODELS = modelConfig.selectedModels.map((id: string) => {
@@ -14,8 +15,10 @@ const DEFAULT_MODELS = modelConfig.selectedModels.map((id: string) => {
 export async function GET() {
   try {
     const db = await getDb();
-    const settings = await db.collection('settings').findOne({ _id: 'global_settings' as any });
+    const settings = await db.collection<SettingsDocument>('settings').findOne({ _id: 'global_settings' });
     
+    // SECURITY: Explicitly return only safe, UI-necessary fields to prevent leaking 
+    // sensitive data like apiKeyEnv or other internal configuration.
     return NextResponse.json({
       models: settings?.models || DEFAULT_MODELS,
       providers: settings?.providers || DEFAULT_PROVIDERS,

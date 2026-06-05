@@ -8,6 +8,7 @@ import { buildSystemContext } from '@/lib/context';
 import { isUncertainResponse, isPerplexityRecheck, isExitPerplexityMode, queryPerplexity, queryPerplexityForSnippets } from '@/lib/perplexity';
 import { classifyIntent, RouterResult } from '@/lib/router';
 import { logToServer } from '@/lib/logger';
+import { SettingsDocument } from '@/lib/types';
 
 const MAX_WEB_SEARCH_CONTEXT_CHARS = 15000;
 const MAX_HISTORY_CHARS = 100000;
@@ -24,8 +25,17 @@ function ensureImagesDir() {
 
 function saveBase64Image(base64Data: string, mimeType: string): string {
   ensureImagesDir();
-  const ext = mimeType.split('/')[1]?.split(';')[0] || 'png';
-  const filename = `img_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+  
+  // Sanitize MIME type and enforce strict whitelist to prevent path traversal or executable uploads
+  const rawExt = mimeType.split('/')[1]?.split(';')[0]?.toLowerCase() || 'png';
+  const allowedExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
+  const ext = allowedExtensions.includes(rawExt) ? rawExt : 'png';
+  
+  // Generate safe filename and use path.basename as a final safeguard
+  const randomStr = Math.random().toString(36).substring(2, 8);
+  const safeFilename = `img_${Date.now()}_${randomStr}.${ext}`;
+  const filename = path.basename(safeFilename);
+  
   const filePath = path.join(IMAGES_DIR, filename);
   const buffer = Buffer.from(base64Data, 'base64');
   fs.writeFileSync(filePath, buffer);
@@ -98,8 +108,8 @@ function extractAndSaveImages(content: string): string {
 }
 
 async function getProviderForModel(modelId: string) {
-  const db = await getDb();
-  const settings = await db.collection('settings').findOne({ _id: 'global_settings' as any });
+    const db = await getDb();
+    const settings = await db.collection<SettingsDocument>('settings').findOne({ _id: 'global_settings' });
   
   const providers = settings?.providers || modelConfig.providers;
   const models = settings?.models || [];
@@ -182,7 +192,7 @@ export async function POST(request: Request) {
     }));
 
     const dynamicContextRaw = await buildSystemContext(messageContent);
-    const settings = await db.collection('settings').findOne({ _id: 'global_settings' as any });
+    const settings = await db.collection<SettingsDocument>('settings').findOne({ _id: 'global_settings' });
     // Skip all context (date/time + global prompt) when bypassing router (LLM Only mode)
     const dynamicContext = bypassRouter ? '' : dynamicContextRaw;
     const globalPrompt = bypassRouter ? '' : (settings?.globalSystemPrompt || '');

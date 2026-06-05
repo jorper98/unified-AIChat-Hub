@@ -9,6 +9,11 @@ export async function GET(
   try {
     const db = await getDb();
     const threadId = context.params.id;
+    const { searchParams } = new URL(request.url);
+    
+    // Pagination parameters for messages (default limit: 100, skip: 0)
+    const limit = Math.max(1, parseInt(searchParams.get('limit') || '100', 10) || 100);
+    const skip = Math.max(0, parseInt(searchParams.get('skip') || '0', 10) || 0);
 
     if (!threadId || !ObjectId.isValid(threadId)) {
       return NextResponse.json({ error: "Invalid thread ID format" }, { status: 400 });
@@ -18,6 +23,8 @@ export async function GET(
     const messages = await db.collection('messages')
       .find({ threadId: new ObjectId(threadId) })
       .sort({ createdAt: 1 })
+      .skip(skip)
+      .limit(limit)
       .toArray();
 
     return NextResponse.json({ 
