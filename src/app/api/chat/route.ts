@@ -9,6 +9,11 @@ import { isUncertainResponse, isPerplexityRecheck, isExitPerplexityMode, queryPe
 import { classifyIntent, RouterResult } from '@/lib/router';
 import { logToServer } from '@/lib/logger';
 
+const MAX_WEB_SEARCH_CONTEXT_CHARS = 15000;
+const MAX_HISTORY_CHARS = 100000;
+const TRUNCATED_HISTORY_CHARS = 80000;
+const MIN_HISTORY_MESSAGES = 4;
+
 const IMAGES_DIR = path.join(process.cwd(), 'public', 'images');
 
 function ensureImagesDir() {
@@ -438,8 +443,8 @@ export async function POST(request: Request) {
     if (webSearchContext) {
       console.log(`[WebSearch] Injecting context (${webSearchContext.length} chars)`);
       // Truncate search context if it's too large (keep under 15k chars)
-      const truncatedContext = webSearchContext.length > 15000 
-        ? webSearchContext.substring(0, 15000) + '\n</web_search_context>' 
+      const truncatedContext = webSearchContext.length > MAX_WEB_SEARCH_CONTEXT_CHARS
+        ? webSearchContext.substring(0, MAX_WEB_SEARCH_CONTEXT_CHARS) + '\n</web_search_context>'
         : webSearchContext;
       formattedHistory.unshift({
         role: 'system',
@@ -458,9 +463,9 @@ export async function POST(request: Request) {
 
     // Safety: truncate history if it exceeds token limits to prevent API errors
     const totalChars = formattedHistory.reduce((sum, msg) => sum + msg.content.length, 0);
-    if (totalChars > 100000) {
+    if (totalChars > MAX_HISTORY_CHARS) {
       console.log(`[Chat] History too large (${totalChars} chars), truncating oldest messages`);
-      while (formattedHistory.length > 4 && formattedHistory.reduce((sum, msg) => sum + msg.content.length, 0) > 80000) {
+      while (formattedHistory.length > MIN_HISTORY_MESSAGES && formattedHistory.reduce((sum, msg) => sum + msg.content.length, 0) > TRUNCATED_HISTORY_CHARS) {
         formattedHistory.shift();
       }
     }

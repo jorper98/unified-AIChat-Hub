@@ -5,6 +5,8 @@ import AdmZip from 'adm-zip';
 import fs from 'fs';
 import path from 'path';
 
+const MAX_BACKUP_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
@@ -13,6 +15,11 @@ export async function POST(request: Request) {
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    }
+
+    const fileSize = file.size;
+    if (fileSize > MAX_BACKUP_FILE_SIZE) {
+      return NextResponse.json({ error: `Backup file too large. Maximum size is ${MAX_BACKUP_FILE_SIZE / (1024 * 1024)}MB` }, { status: 413 });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
