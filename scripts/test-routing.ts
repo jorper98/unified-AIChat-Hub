@@ -149,7 +149,7 @@ async function runTests() {
     console.log(`   Prompt: "${testCase.prompt}"`);
 
     try {
-      const response = await fetch(API_URL, {
+      const response: Response = await fetch(API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -168,7 +168,7 @@ async function runTests() {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data: any = await response.json();
 
       // Capture the thread ID from the first response to reuse for subsequent messages
       if (!currentThreadId && data.threadId) {

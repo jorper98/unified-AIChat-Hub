@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.2
+- Refactored monolithic 834-line chat route into 4 focused, modular libraries (`thread.ts`, `model-providers.ts`, `image-processing.ts`, `response-parser.ts`)
+- Replaced fragile, overlapping regex chains for image extraction with a robust, recursive JSON parsing approach
+- Added automated routing test script with randomized prompts and timestamped thread naming for reliable end-to-end verification
+- Migrated `TIMEZONE` and `WEATHER_LOCATION` configuration from `.env` to the database-backed Settings UI
+
 ## v0.2.1
 - Added automated routing test script (`npm run test:routing`) with randomized prompts for weather, stocks, and image generation
 - Test runs now create cleanly named, timestamped threads (e.g., "Test Run: YYYYMMDD-HHMMSS") for easy identification
