@@ -15,5 +15,7 @@ data/
 public/images/
 tsconfig.tsbuildinfo
 .kilo/
+*.wt
+
 
 

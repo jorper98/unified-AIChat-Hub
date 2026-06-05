@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.1.7
+- Utility LLMs Settings Section: configurable Router LLM and Image Generation LLM via settings UI
+- Image Generation Routing: router classifies intent as image_generation and calls dedicated image model
+- Router model is now configurable (previously hardcoded to gpt-4o-mini)
+- Dynamic pricing for router based on configured model
+- Image generation cost tracking in CostCalculator
+- Tool use indicators in chat: shows direct, web_search (Perplexity), or image (model-name)
+- Web search context truncation and history overflow protection
+- Single source of truth for utility model settings (MongoDB)
+
 ## v0.1.6
 - Intelligent Intent Router: lightweight GPT-4o Mini classifier routes queries to web_search or direct_reply
 - Structured JSON schema routing with auto-fallback on timeout/error

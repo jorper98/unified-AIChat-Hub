@@ -221,8 +221,13 @@ export async function POST(request: Request) {
     // Check if user wants to recheck the last question via Perplexity
     let skipModelCall = false;
     let perplexityUsage = null;
+    let imageGenUsage = null;
     let aiTextOutput = "";
     let usage: any = {};
+
+    // Router model and image generation model from settings (loaded earlier)
+    const routerModel = settings?.routerModel || 'openai/gpt-4o-mini';
+    const imageGenerationModel = settings?.imageGenerationModel || 'google/gemini-3.1-flash-image-preview';
 
     // Router integration: classify intent before main LLM call
     // Skip router when in Perplexity mode, explicit Perplexity recheck, or user requested LLM-only
@@ -231,7 +236,167 @@ export async function POST(request: Request) {
         .filter(msg => msg.role === 'user' || msg.role === 'assistant')
         .map(msg => ({ role: msg.role as 'user' | 'assistant', content: msg.content }));
 
-      routerResult = await classifyIntent(messageContent, historyForRouter);
+      routerResult = await classifyIntent(messageContent, historyForRouter, routerModel);
+
+      // Execute image generation if router classified it as image_generation
+      if (routerResult.route === 'image_generation' && routerResult.imagePrompt) {
+        console.log(`[Router] Image generation triggered: "${routerResult.imagePrompt.substring(0, 80)}..."`);
+        logToServer(`Router image_generation model=${selectedModel}: "${routerResult.imagePrompt.substring(0, 80)}..."`, 'info');
+
+        const imageProvider = await getProviderForModel(imageGenerationModel);
+        const imageHeaders: Record<string, string> = { "Content-Type": "application/json" };
+        if (imageProvider.apiKeyEnv && process.env[imageProvider.apiKeyEnv]) {
+          imageHeaders["Authorization"] = `Bearer ${process.env[imageProvider.apiKeyEnv]}`;
+        }
+        if (imageProvider.id === 'openrouter') {
+          imageHeaders["HTTP-Referer"] = "http://localhost:3031";
+          imageHeaders["X-Title"] = "Unified Chat Hub";
+        }
+
+        const imageMessages = [
+          { role: 'user', content: routerResult.imagePrompt }
+        ];
+
+        try {
+          const imageResponse = await fetch(imageProvider.endpoint, {
+            method: "POST",
+            headers: imageHeaders,
+            body: JSON.stringify({
+              model: imageGenerationModel,
+              messages: imageMessages
+            })
+          });
+          const imageCompletionData = await imageResponse.json();
+
+          if (imageCompletionData.choices?.[0]?.message) {
+            const imageMessage = imageCompletionData.choices[0].message;
+            console.log('[Image Gen] Response structure:', JSON.stringify({
+              hasContent: !!imageMessage.content,
+              hasParts: !!imageMessage.parts,
+              partsLength: imageMessage.parts?.length,
+              hasImages: !!imageMessage.images,
+              imagesLength: imageMessage.images?.length,
+              finishReason: imageCompletionData.choices[0].finish_reason
+            }));
+            
+            if (imageMessage.content) {
+              aiTextOutput = imageMessage.content;
+              console.log('[Image Gen] Content length:', imageMessage.content.length);
+            }
+            if (imageMessage.parts && Array.isArray(imageMessage.parts)) {
+              for (const part of imageMessage.parts) {
+                const inlineData = part.inlineData?.data || part.inlineData?.inlineData;
+                if (inlineData) {
+                  const mimeType = part.inlineData?.mimeType || 'image/png';
+                  const imageUrl = saveBase64Image(inlineData, mimeType);
+                  aiTextOutput += `\n\n![Generated Image](${imageUrl})`;
+                  console.log(`[Image Gen] Saved inlineData image to ${imageUrl}`);
+                }
+                if (part.type === 'image_url' && part.image_url?.url) {
+                  const url = part.image_url.url;
+                  if (url.startsWith('data:image')) {
+                    const match = url.match(/data:(image\/[a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=]+)/);
+                    if (match) {
+                      const imageUrl = saveBase64Image(match[2], match[1]);
+                      aiTextOutput += `\n\n![Generated Image](${imageUrl})`;
+                      console.log(`[Image Gen] Saved image_url data to ${imageUrl}`);
+                    }
+                  } else {
+                    aiTextOutput += `\n\n![Generated Image](${url})`;
+                    console.log(`[Image Gen] Using external image URL: ${url}`);
+                  }
+                }
+              }
+            }
+            if (imageMessage.images && Array.isArray(imageMessage.images)) {
+              for (const img of imageMessage.images) {
+                if (img.image_url?.url) {
+                  const url = img.image_url.url;
+                  if (url.startsWith('data:image')) {
+                    const match = url.match(/data:(image\/[a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=]+)/);
+                    if (match) {
+                      const imageUrl = saveBase64Image(match[2], match[1]);
+                      aiTextOutput += `\n\n![Generated Image](${imageUrl})`;
+                      console.log(`[Image Gen] Saved base64 image to ${imageUrl}`);
+                    }
+                  } else {
+                    aiTextOutput += `\n\n![Generated Image](${url})`;
+                  }
+                } else if (img.url) {
+                  if (img.url.startsWith('data:image')) {
+                    const match = img.url.match(/data:(image\/[a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=]+)/);
+                    if (match) {
+                      const imageUrl = saveBase64Image(match[2], match[1]);
+                      aiTextOutput += `\n\n![Generated Image](${imageUrl})`;
+                    }
+                  } else {
+                    aiTextOutput += `\n\n![Generated Image](${img.url})`;
+                  }
+                } else if (img.base64 || img.data) {
+                  const base64Data = img.base64 || img.data;
+                  const mimeType = img.mime_type || img.mimeType || 'image/png';
+                  const imageUrl = saveBase64Image(base64Data, mimeType);
+                  aiTextOutput += `\n\n![Generated Image](${imageUrl})`;
+                  console.log(`[Image Gen] Saved base64 from data field to ${imageUrl}`);
+                }
+              }
+            }
+            if (!aiTextOutput) {
+              aiTextOutput = "Image generation completed but no image could be extracted. Check server logs for full response.";
+              console.log('[Image Gen] No image extracted, full response:', JSON.stringify(imageCompletionData, null, 2).substring(0, 2000));
+            }
+             const imgUsage = imageCompletionData.usage || {};
+             imageGenUsage = {
+               promptTokens: imgUsage.prompt_tokens || imgUsage.promptTokens || 0,
+               completionTokens: imgUsage.completion_tokens || imgUsage.completionTokens || 0,
+               totalTokens: (imgUsage.prompt_tokens || imgUsage.promptTokens || 0) + (imgUsage.completion_tokens || imgUsage.completionTokens || 0),
+               actualCost: imgUsage.cost || 0,
+               model: imageGenerationModel,
+             };
+            console.log('[Image Gen] Final aiTextOutput length:', aiTextOutput.length, 'content:', aiTextOutput.substring(0, 200));
+            
+            // Robust fallback: scan raw response for any image data
+            if (!aiTextOutput.includes('![Generated Image]')) {
+              const rawJson = JSON.stringify(imageCompletionData);
+              console.log('[Image Gen] Raw response length:', rawJson.length);
+              console.log('[Image Gen] Raw response keys:', Object.keys(imageCompletionData).join(', '));
+              
+              // Check for base64 image data anywhere in response
+              const base64Match = rawJson.match(/data:(image\/[a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=]{50,})/);
+              if (base64Match) {
+                const imageUrl = saveBase64Image(base64Match[2], base64Match[1]);
+                aiTextOutput = `![Generated Image](${imageUrl})`;
+                console.log('[Image Gen] Fallback: extracted base64 image to', imageUrl);
+              } else {
+                // Check for direct image URLs
+                const urlMatch = rawJson.match(/(https?:\/\/[^\s"'<>]+\.(png|jpg|jpeg|gif|webp))/i);
+                if (urlMatch) {
+                  aiTextOutput = `![Generated Image](${urlMatch[1]})`;
+                  console.log('[Image Gen] Fallback: extracted image URL', urlMatch[1]);
+                } else {
+                  // Check for any /images/ path in response
+                  const pathMatch = rawJson.match(/(\/images\/img_[\w]+\.png)/);
+                  if (pathMatch) {
+                    aiTextOutput = `![Generated Image](${pathMatch[1]})`;
+                    console.log('[Image Gen] Fallback: found image path', pathMatch[1]);
+                  } else {
+                    console.log('[Image Gen] Fallback: no image data found in response');
+                    console.log('[Image Gen] Raw response snippet:', rawJson.substring(0, 500));
+                    aiTextOutput = aiTextOutput || 'Image generation completed but no image could be extracted. Check server logs for response details.';
+                  }
+                }
+              }
+            }
+            
+            skipModelCall = true;
+          }
+        } catch (imageError: any) {
+          console.error('[Image Gen] Failed:', imageError.message);
+          logToServer(`Image Gen failed: ${imageError.message}`, 'error');
+          aiTextOutput = `Image generation failed: ${imageError.message}`;
+          skipModelCall = true;
+        }
+      }
 
       // Execute web search if router classified it as web_search
       if (routerResult.route === 'web_search' && routerResult.searchQuery) {
@@ -271,9 +436,14 @@ export async function POST(request: Request) {
 
     // Inject web search context as a system message if available
     if (webSearchContext) {
+      console.log(`[WebSearch] Injecting context (${webSearchContext.length} chars)`);
+      // Truncate search context if it's too large (keep under 15k chars)
+      const truncatedContext = webSearchContext.length > 15000 
+        ? webSearchContext.substring(0, 15000) + '\n</web_search_context>' 
+        : webSearchContext;
       formattedHistory.unshift({
         role: 'system',
-        content: webSearchContext
+        content: truncatedContext
       });
     }
 
@@ -284,6 +454,15 @@ export async function POST(request: Request) {
         content: `You have access to web search results wrapped in <web_search_context> tags. Use this information to provide accurate, up-to-date responses. Always cite your sources by referencing the source URLs when using search data (e.g., [Source: URL]).`
       };
       formattedHistory.unshift(citationInstruction);
+    }
+
+    // Safety: truncate history if it exceeds token limits to prevent API errors
+    const totalChars = formattedHistory.reduce((sum, msg) => sum + msg.content.length, 0);
+    if (totalChars > 100000) {
+      console.log(`[Chat] History too large (${totalChars} chars), truncating oldest messages`);
+      while (formattedHistory.length > 4 && formattedHistory.reduce((sum, msg) => sum + msg.content.length, 0) > 80000) {
+        formattedHistory.shift();
+      }
     }
 
     // Priority: exit trigger > auto-continue mode > recheck trigger > normal model
@@ -401,6 +580,16 @@ export async function POST(request: Request) {
 
       const choice = completionData.choices?.[0];
       const message = choice?.message;
+      const finishReason = choice?.finish_reason;
+
+      // Log error finish reasons for debugging
+      if (finishReason && finishReason !== 'stop' && finishReason !== 'length') {
+        console.log(`[Chat] finish_reason: ${finishReason}`);
+        console.log(`[Chat] History size: ${formattedHistory.length} messages, ${formattedHistory.reduce((s, m) => s + m.content.length, 0)} chars`);
+        if (webSearchContext) {
+          console.log(`[Chat] Web search context size: ${webSearchContext.length} chars`);
+        }
+      }
 
       aiTextOutput = message?.content || "";
 
@@ -588,6 +777,7 @@ export async function POST(request: Request) {
       systemInstruction: systemInstruction || "You are a helpful assistant.",
       promptName: promptName || null,
       perplexityUsed: perplexityUsage ? true : false,
+      routingTool: routerResult?.route === 'image_generation' ? imageGenerationModel : routerResult?.route === 'web_search' ? 'web_search' : 'direct',
       usage: {
         promptTokens: usage.promptTokens || usage.prompt_tokens || 0,
         completionTokens: usage.completionTokens || usage.completion_tokens || 0,
@@ -596,6 +786,9 @@ export async function POST(request: Request) {
         actualCost: usage.cost || 0,
         perplexityTokens: perplexityUsage?.totalTokens || 0,
         perplexityCost: perplexityUsage?.actualCost || 0,
+        imageGenTokens: imageGenUsage?.totalTokens || 0,
+        imageGenCost: imageGenUsage?.actualCost || 0,
+        imageGenModel: imageGenUsage?.model || '',
         routerTokens: routerResult ? routerResult.promptTokens + routerResult.completionTokens : 0,
         routerCost: routerResult ? routerResult.cost : 0,
       },
@@ -605,10 +798,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ 
       threadId: activeThreadId.toHexString(), 
       response: aiTextOutput,
+      routingTool: routerResult?.route === 'image_generation' ? imageGenerationModel : routerResult?.route === 'web_search' ? 'web_search' : 'direct',
+      perplexityUsed: perplexityUsage ? true : false,
       usage: {
         ...usage,
         perplexityTokens: perplexityUsage?.totalTokens || 0,
         perplexityCost: perplexityUsage?.actualCost || 0,
+        imageGenTokens: imageGenUsage?.totalTokens || 0,
+        imageGenCost: imageGenUsage?.actualCost || 0,
+        imageGenModel: imageGenUsage?.model || '',
         routerTokens: routerResult ? routerResult.promptTokens + routerResult.completionTokens : 0,
         routerCost: routerResult ? routerResult.cost : 0,
       }
