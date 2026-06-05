@@ -1,3 +1,5 @@
+import { SettingsDocument } from './types';
+
 const WEATHER_KEYWORDS = ['weather', 'temperature', 'forecast', 'rain', 'sunny', 'cloudy', 'snow', 'wind', 'humidity', 'degrees', 'celsius', 'fahrenheit'];
 
 function isWeatherRelated(message: string): boolean {
@@ -36,8 +38,27 @@ function extractWeatherLocation(message: string, defaultLocation: string): strin
 }
 
 export async function buildSystemContext(messageContent: string): Promise<string> {
-  const timezone = process.env.TIMEZONE || 'UTC';
-  const defaultWeatherLocation = process.env.WEATHER_LOCATION || '';
+  // Fetch settings from database to get user-configured timezone and weather location
+  // Fallback to process.env or defaults if not set in DB
+  let timezone = 'UTC';
+  let defaultWeatherLocation = '';
+  
+  try {
+    const { getDb } = await import('@/lib/db');
+    const db = await getDb();
+    const settings = await db.collection<SettingsDocument>('settings').findOne({ _id: 'global_settings' as any });
+    if (settings) {
+      timezone = settings.timezone || process.env.TIMEZONE || 'UTC';
+      defaultWeatherLocation = settings.weatherLocation !== undefined ? settings.weatherLocation : (process.env.WEATHER_LOCATION || '');
+    } else {
+      timezone = process.env.TIMEZONE || 'UTC';
+      defaultWeatherLocation = process.env.WEATHER_LOCATION || '';
+    }
+  } catch {
+    // Fallback to env vars if DB fetch fails
+    timezone = process.env.TIMEZONE || 'UTC';
+    defaultWeatherLocation = process.env.WEATHER_LOCATION || '';
+  }
 
   const now = new Date();
 

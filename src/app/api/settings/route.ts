@@ -26,7 +26,9 @@ export async function GET() {
       themeColors: settings?.themeColors || null,
       globalSystemPrompt: settings?.globalSystemPrompt || '',
       routerModel: settings?.routerModel || 'openai/gpt-4o-mini',
-      imageGenerationModel: settings?.imageGenerationModel || 'google/gemini-3.1-flash-image-preview'
+      imageGenerationModel: settings?.imageGenerationModel || 'google/gemini-3.1-flash-image-preview',
+      timezone: settings?.timezone || 'UTC',
+      weatherLocation: settings?.weatherLocation || ''
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -35,7 +37,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { models, providers, theme, themeColors, globalSystemPrompt, routerModel, imageGenerationModel } = await request.json();
+    const { models, providers, theme, themeColors, globalSystemPrompt, routerModel, imageGenerationModel, timezone, weatherLocation } = await request.json();
     const db = await getDb();
 
     const updateData: any = { updatedAt: new Date() };
@@ -46,6 +48,8 @@ export async function POST(request: Request) {
     if (globalSystemPrompt !== undefined) updateData.globalSystemPrompt = globalSystemPrompt;
     if (routerModel !== undefined) updateData.routerModel = routerModel;
     if (imageGenerationModel !== undefined) updateData.imageGenerationModel = imageGenerationModel;
+    if (timezone !== undefined) updateData.timezone = timezone;
+    if (weatherLocation !== undefined) updateData.weatherLocation = weatherLocation;
 
     await db.collection('settings').updateOne(
       { _id: 'global_settings' as any },

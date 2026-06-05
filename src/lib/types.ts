@@ -9,6 +9,8 @@ export interface SettingsDocument {
   globalSystemPrompt?: string;
   routerModel?: string;
   imageGenerationModel?: string;
+  timezone?: string;
+  weatherLocation?: string;
   updatedAt?: Date;
 }
 
