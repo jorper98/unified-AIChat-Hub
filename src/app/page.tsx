@@ -9,7 +9,7 @@ import { CostCalculator } from './components/CostCalculator';
 import { RawDataModal } from './components/RawDataModal';
 import { estimateTokens, formatTokenCount, MODEL_CONTEXT_LIMITS, MODEL_PRICING } from '@/lib/tokens';
 
-const APP_VERSION = '0.1.8';
+const APP_VERSION = '0.1.9';
 
 interface ChatTurn {
   role: 'user' | 'assistant';

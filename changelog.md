@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.1.9
+- Added thread and message pagination with configurable limits (25, 50, 100) and "Load More" UI controls to improve performance and reduce memory usage
+- Fixed MongoDB connection race condition by implementing a promise-based connection lock to prevent duplicate connections under concurrent load
+- Replaced unsafe `as any` type casts with proper TypeScript interfaces (`SettingsDocument`, `ThreadDocument`, `MessageDocument`) for better type safety
+- Made router and Perplexity API timeouts configurable via `ROUTER_TIMEOUT_MS` and `PERPLEXITY_TIMEOUT_MS` environment variables
+- Removed flawed client-side API secret implementation to prevent security vulnerabilities, deferring to network-level security for self-hosted deployments
+
 ## v0.1.8
 - Added Settings modal in About page to display current configuration (Models, Providers, Utility LLMs, Global System Prompt, Theme, and Chat/Archive statistics)
 
