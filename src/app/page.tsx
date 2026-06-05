@@ -9,7 +9,7 @@ import { CostCalculator } from './components/CostCalculator';
 import { RawDataModal } from './components/RawDataModal';
 import { estimateTokens, formatTokenCount, MODEL_CONTEXT_LIMITS, MODEL_PRICING } from '@/lib/tokens';
 
-const APP_VERSION = '0.1.5';
+const APP_VERSION = '0.1.7';
 
 interface ChatTurn {
   role: 'user' | 'assistant';
@@ -18,6 +18,7 @@ interface ChatTurn {
   promptName?: string;
   systemInstruction?: string;
   perplexityUsed?: boolean;
+  routingTool?: string;
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -26,6 +27,11 @@ interface ChatTurn {
     actualCost?: number;
     perplexityTokens?: number;
     perplexityCost?: number;
+    routerTokens?: number;
+    routerCost?: number;
+    imageGenTokens?: number;
+    imageGenCost?: number;
+    imageGenModel?: string;
   };
 }
 
@@ -227,7 +233,8 @@ export default function UnifiedChatInterface() {
             usage: m.usage,
             systemInstruction: m.systemInstruction,
             promptName: m.promptName,
-            perplexityUsed: m.perplexityUsed
+            perplexityUsed: m.perplexityUsed,
+            routingTool: m.routingTool
           }));
           setMessages(mappedMessages);
           
@@ -479,6 +486,8 @@ export default function UnifiedChatInterface() {
         content: data.response, 
         modelUsed: model,
         promptName: selectedPromptName || undefined,
+        routingTool: data.routingTool,
+        perplexityUsed: data.perplexityUsed,
         usage: data.usage
       }]);
 
@@ -680,12 +689,12 @@ export default function UnifiedChatInterface() {
                   <div className={`text-[10px] font-mono px-1 mt-0.5 space-y-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                     <span>
                       Generated via: {msg.modelUsed.split('/')[1] || msg.modelUsed}{msg.promptName ? ` (${msg.promptName})` : ''}
+                      {msg.routingTool === 'web_search' && ' | web_search (Perplexity)'}
+                      {msg.routingTool && msg.routingTool.includes('/') && ` | image (${msg.routingTool.split('/')[1]})`}
+                      {msg.routingTool === 'direct' && ' | direct'}
+                      {msg.perplexityUsed && !msg.routingTool && ' | Perplexity'}
+                      {!msg.routingTool && msg.usage?.routerTokens && msg.usage.routerTokens > 0 && ' | direct'}
                     </span>
-                    {msg.systemInstruction && (
-                      <span className="block text-gray-600 truncate max-w-md" title={msg.systemInstruction}>
-                        using: {msg.systemInstruction}
-                      </span>
-                    )}
                   </div>
                 )}
               </div>

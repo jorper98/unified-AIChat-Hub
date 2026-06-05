@@ -58,7 +58,7 @@ const DEFAULT_LIGHT: ThemeColors = {
   borderAlt: '#d1d5db'
 };
 
-type SettingsSection = 'models' | 'providers' | 'theme' | 'backup' | 'global-prompt';
+type SettingsSection = 'models' | 'providers' | 'theme' | 'backup' | 'global-prompt' | 'utility-llms';
 
 export default function SettingsPage() {
   const [models, setModels] = useState<Model[]>([]);
@@ -93,6 +93,8 @@ export default function SettingsPage() {
   const [restoreMode, setRestoreMode] = useState<'replace' | 'merge'>('replace');
   const [restoreResult, setRestoreResult] = useState<{ success: boolean; message: string; details?: any } | null>(null);
   const [globalSystemPrompt, setGlobalSystemPrompt] = useState('');
+  const [routerModel, setRouterModel] = useState('openai/gpt-4o-mini');
+  const [imageGenerationModel, setImageGenerationModel] = useState('google/gemini-3.1-flash-image-preview');
 
   useEffect(() => {
     setMounted(true);
@@ -142,6 +144,8 @@ export default function SettingsPage() {
           if (data.themeColors.light) setLightColors(data.themeColors.light);
         }
         if (data.globalSystemPrompt !== undefined) setGlobalSystemPrompt(data.globalSystemPrompt || '');
+        if (data.routerModel) setRouterModel(data.routerModel);
+        if (data.imageGenerationModel) setImageGenerationModel(data.imageGenerationModel);
       });
   }, []);
 
@@ -252,6 +256,8 @@ export default function SettingsPage() {
     setSaving(true);
     localStorage.setItem('theme', theme);
     
+    console.log('[Settings Page] Saving:', { routerModel, imageGenerationModel });
+    
     await fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -260,7 +266,9 @@ export default function SettingsPage() {
         providers,
         theme,
         themeColors: { dark: darkColors, light: lightColors },
-        globalSystemPrompt
+        globalSystemPrompt,
+        routerModel,
+        imageGenerationModel
       })
     });
     setSaving(false);
@@ -435,6 +443,7 @@ export default function SettingsPage() {
     { id: 'providers', label: 'Providers', icon: '' },
     { id: 'theme', label: 'Theme Colors', icon: '' },
     { id: 'global-prompt', label: 'Global System Prompt', icon: '' },
+    { id: 'utility-llms', label: 'Utility LLMs', icon: '' },
     { id: 'backup', label: 'Backup & Restore', icon: '' }
   ];
 
@@ -844,6 +853,53 @@ export default function SettingsPage() {
                   <p className="text-[10px] text-gray-600 mt-1">
                     This text is appended after the automatic date/time/weather context. Leave empty to only inject dynamic context.
                   </p>
+                </div>
+              </>
+            )}
+
+            {activeSection === 'utility-llms' && (
+              <>
+                <h1 className="text-2xl font-bold text-indigo-400">Utility LLMs</h1>
+                <p className="text-sm text-gray-400">
+                  Configure utility language models used for routing and image generation tasks.
+                </p>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 block mb-2">
+                      Router LLM
+                    </label>
+                    <select
+                      value={routerModel}
+                      onChange={(e) => setRouterModel(e.target.value)}
+                      className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-100 focus:outline-none focus:border-indigo-500"
+                    >
+                      {models.map(m => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-gray-600 mt-1">
+                      The LLM used to classify user intent (web search vs direct reply vs image generation)
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 block mb-2">
+                      Image Generation LLM
+                    </label>
+                    <select
+                      value={imageGenerationModel}
+                      onChange={(e) => setImageGenerationModel(e.target.value)}
+                      className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-100 focus:outline-none focus:border-indigo-500"
+                    >
+                      {models.map(m => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-gray-600 mt-1">
+                      The LLM used when users request image generation
+                    </p>
+                  </div>
                 </div>
               </>
             )}

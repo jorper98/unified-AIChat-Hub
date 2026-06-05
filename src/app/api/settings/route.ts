@@ -21,7 +21,9 @@ export async function GET() {
       providers: settings?.providers || DEFAULT_PROVIDERS,
       theme: settings?.theme || 'dark',
       themeColors: settings?.themeColors || null,
-      globalSystemPrompt: settings?.globalSystemPrompt || ''
+      globalSystemPrompt: settings?.globalSystemPrompt || '',
+      routerModel: settings?.routerModel || 'openai/gpt-4o-mini',
+      imageGenerationModel: settings?.imageGenerationModel || 'google/gemini-3.1-flash-image-preview'
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -30,7 +32,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { models, providers, theme, themeColors, globalSystemPrompt } = await request.json();
+    const { models, providers, theme, themeColors, globalSystemPrompt, routerModel, imageGenerationModel } = await request.json();
     const db = await getDb();
 
     const updateData: any = { updatedAt: new Date() };
@@ -39,6 +41,8 @@ export async function POST(request: Request) {
     if (theme !== undefined) updateData.theme = theme;
     if (themeColors !== undefined) updateData.themeColors = themeColors;
     if (globalSystemPrompt !== undefined) updateData.globalSystemPrompt = globalSystemPrompt;
+    if (routerModel !== undefined) updateData.routerModel = routerModel;
+    if (imageGenerationModel !== undefined) updateData.imageGenerationModel = imageGenerationModel;
 
     await db.collection('settings').updateOne(
       { _id: 'global_settings' as any },

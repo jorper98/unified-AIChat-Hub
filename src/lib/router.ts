@@ -1,9 +1,11 @@
 import { logToServer } from './logger';
 import { queryPerplexity } from './perplexity';
+import { MODEL_PRICING } from './tokens';
 
 export interface RouterResult {
-  route: 'web_search' | 'direct_reply';
+  route: 'web_search' | 'direct_reply' | 'image_generation';
   searchQuery?: string;
+  imagePrompt?: string;
   format?: 'full_answer' | 'snippets';
   promptTokens: number;
   completionTokens: number;
@@ -12,7 +14,8 @@ export interface RouterResult {
 
 const ROUTER_SYSTEM_PROMPT = `You are an intent classification router for a chatbot. Analyze the user's latest message and classify it into exactly one route:
 
-- "web_search": The user is asking about real-time information, current events, news, live data, recent updates, time-sensitive facts, sports scores, stock prices, weather forecasts, or anything requiring current web knowledge beyond a static knowledge cutoff.
+- "web_search": The user is asking about real-time information, current events, news, live data, recent updates, time-sensitive facts, sports scores, stock prices, weather forecasts, or anything requiring current web knowledge beyond a static knowledge cutoff. ALSO route here when the user asks about familiarity with a person, place, concept, or topic (e.g., "are you familiar with...", "do you know about...", "have you heard of...") since these often require verifying current information.
+- "image_generation": The user is requesting, asking for, or describing an image to be generated. This includes requests like "draw me...", "create an image of...", "generate a picture of...", "show me a photo of...", etc.
 - "direct_reply": The user is asking about general knowledge, creative writing, code help, analysis, opinions, math, logic, conversation, greetings, or anything that can be answered without live web data.
 
 When classifying as "web_search", also:
@@ -21,9 +24,11 @@ When classifying as "web_search", also:
    - "full_answer": For factual, straightforward, time-sensitive queries (news, scores, prices, simple facts)
    - "snippets": For complex, multi-part, analytical, comparison, or opinion-seeking queries that need multiple sources
 
+When classifying as "image_generation", also provide an "imagePrompt" field with a clear, detailed prompt suitable for an image generation model.
+
 Rules:
 - Follow-up messages that reference prior context may still need web search if the topic requires real-time data
-- If uncertain, prefer "direct_reply" (there is a fallback uncertainty detector)
+- When the user asks about familiarity or knowledge of a specific topic/person/thing, prefer "web_search" to verify current information
 - Keep search queries concise and specific
 - Only output valid JSON matching the schema`;
 
@@ -32,25 +37,30 @@ const ROUTER_JSON_SCHEMA = {
   properties: {
     route: {
       type: 'string' as const,
-      enum: ['web_search', 'direct_reply'],
+      enum: ['web_search', 'direct_reply', 'image_generation'],
     },
     searchQuery: {
       type: 'string' as const,
-      description: 'Refined search query for web search. Use empty string if route is direct_reply.',
+      description: 'Refined search query for web search. Use empty string if route is not web_search.',
+    },
+    imagePrompt: {
+      type: 'string' as const,
+      description: 'Detailed image generation prompt. Use empty string if route is not image_generation.',
     },
     format: {
       type: 'string' as const,
       enum: ['full_answer', 'snippets'],
-      description: 'Response format for web search. Use full_answer if route is direct_reply.',
+      description: 'Response format for web search. Use full_answer if route is not web_search.',
     },
   },
-  required: ['route', 'searchQuery', 'format'],
+  required: ['route', 'searchQuery', 'imagePrompt', 'format'],
   additionalProperties: false,
 };
 
 export async function classifyIntent(
   userMessage: string,
   conversationHistory: Array<{ role: string; content: string }>,
+  routerModel: string = 'openai/gpt-4o-mini',
 ): Promise<RouterResult> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
@@ -71,6 +81,9 @@ export async function classifyIntent(
 
     messages.push({ role: 'user', content: userMessage });
 
+    // Get pricing for the router model
+    const pricing = MODEL_PRICING[routerModel] || { input: 0.15, output: 0.60 };
+
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -80,7 +93,7 @@ export async function classifyIntent(
         'X-Title': 'Unified Chat Hub',
       },
       body: JSON.stringify({
-        model: 'openai/gpt-4o-mini',
+        model: routerModel,
         messages,
         max_tokens: 100,
         temperature: 0,
@@ -110,8 +123,7 @@ export async function classifyIntent(
     const usage = data.usage || {};
     const promptTokens = usage.prompt_tokens || 0;
     const completionTokens = usage.completion_tokens || 0;
-    // GPT-4o-mini pricing: $0.15/1M input, $0.60/1M output
-    const cost = (promptTokens / 1_000_000) * 0.15 + (completionTokens / 1_000_000) * 0.60;
+    const cost = (promptTokens / 1_000_000) * pricing.input + (completionTokens / 1_000_000) * pricing.output;
 
     if (!content) {
       console.log('[Router] Empty response from router, defaulting to direct_reply');
@@ -120,7 +132,7 @@ export async function classifyIntent(
 
     const result: Omit<RouterResult, 'promptTokens' | 'completionTokens' | 'cost'> = JSON.parse(content);
 
-    if (result.route !== 'web_search' && result.route !== 'direct_reply') {
+    if (result.route !== 'web_search' && result.route !== 'direct_reply' && result.route !== 'image_generation') {
       console.log(`[Router] Invalid route "${result.route}", defaulting to direct_reply`);
       return { route: 'direct_reply', promptTokens, completionTokens, cost };
     }
@@ -130,9 +142,13 @@ export async function classifyIntent(
       result.format = result.format || 'full_answer';
     }
 
-    const provider = result.route === 'web_search' ? 'Perplexity' : 'GPT';
-    console.log(`[Router] Classification: route=${result.route}, query="${result.searchQuery || 'N/A'}", format=${result.format || 'N/A'} (${promptTokens} in, ${completionTokens} out, $${cost.toFixed(6)})`);
-    logToServer(`Router: ${provider} route=${result.route} query="${result.searchQuery || 'N/A'}" cost=$${cost.toFixed(6)}`, 'info');
+    if (result.route === 'image_generation') {
+      result.imagePrompt = result.imagePrompt || userMessage;
+    }
+
+    const routeLabel = result.route === 'web_search' ? 'web_search (→ Perplexity)' : result.route === 'image_generation' ? 'image_generation (→ Image Gen)' : 'direct_reply';
+    console.log(`[Router] Classification: route=${result.route}, model=${routerModel}, query="${result.searchQuery || 'N/A'}", format=${result.format || 'N/A'}, imagePrompt="${result.imagePrompt ? result.imagePrompt.substring(0, 50) : 'N/A'}..." (${promptTokens} in, ${completionTokens} out, $${cost.toFixed(6)})`);
+    logToServer(`Router [${routerModel}]: ${routeLabel} query="${result.searchQuery || 'N/A'}" cost=$${cost.toFixed(6)}`, 'info');
     return { ...result, promptTokens, completionTokens, cost };
   } catch (error: any) {
     if (error.name === 'AbortError') {

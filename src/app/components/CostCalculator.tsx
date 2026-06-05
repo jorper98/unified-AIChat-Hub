@@ -18,6 +18,9 @@ interface Message {
     perplexityCost?: number;
     routerTokens?: number;
     routerCost?: number;
+    imageGenTokens?: number;
+    imageGenCost?: number;
+    imageGenModel?: string;
   };
 }
 
@@ -50,6 +53,10 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
     let routerTotalTokens = 0;
     let routerTotalCost = 0;
     let routerCount = 0;
+    let imageGenTotalTokens = 0;
+    let imageGenTotalCost = 0;
+    let imageGenCount = 0;
+    let imageGenModelName = '';
 
     let cumulativeContext = 0;
 
@@ -87,6 +94,16 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
           routerTotalTokens += msg.usage.routerTokens || 0;
           routerTotalCost += msg.usage.routerCost || 0;
           routerCount++;
+        }
+
+        // Track Image Generation usage separately
+        if (msg.usage?.imageGenCost && msg.usage.imageGenCost > 0) {
+          imageGenTotalTokens += msg.usage.imageGenTokens || 0;
+          imageGenTotalCost += msg.usage.imageGenCost || 0;
+          imageGenCount++;
+          if (msg.usage.imageGenModel) {
+            imageGenModelName = msg.usage.imageGenModel;
+          }
         }
       }
     }
@@ -151,8 +168,8 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
     if (routerCount > 0) {
       grandTotal += routerTotalCost;
       results.push({
-        modelId: 'router/gpt-4o-mini',
-        modelName: `Router GPT-4o Mini (${routerCount}×)`,
+        modelId: 'router',
+        modelName: `Router (${routerCount}×)`,
         inputTokens: routerTotalTokens,
         outputTokens: 0,
         imageTokens: 0,
@@ -163,8 +180,26 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
       });
     }
 
+    // Add Image Generation row if used
+    if (imageGenCount > 0) {
+      grandTotal += imageGenTotalCost;
+      const imgName = imageGenModelName ? imageGenModelName.split('/')[1] || imageGenModelName : 'Image Gen';
+      results.push({
+        modelId: 'image_generation',
+        modelName: `Image Gen ${imgName} (${imageGenCount}×)`,
+        inputTokens: imageGenTotalTokens,
+        outputTokens: 0,
+        imageTokens: 0,
+        inputCost: 0,
+        outputCost: 0,
+        totalCost: imageGenTotalCost,
+        hasActualCost: true,
+      });
+    }
+
     console.log('[CostCalculator] Router tracking:', { routerCount, routerTotalTokens, routerTotalCost });
     console.log('[CostCalculator] Perplexity tracking:', { perplexityCount, perplexityTotalCost });
+    console.log('[CostCalculator] Image Gen tracking:', { imageGenCount, imageGenTotalCost, imageGenModelName });
 
     return { models: results, grandTotal };
   }, [messages]);
