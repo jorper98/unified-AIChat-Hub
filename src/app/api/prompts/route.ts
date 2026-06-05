@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 
+const MAX_PROMPT_NAME_LENGTH = 200;
+const MAX_PROMPT_CONTENT_LENGTH = 10000;
+
 export async function GET() {
   try {
     const db = await getDb();
@@ -31,9 +34,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Name and content required" }, { status: 400 });
     }
 
+    const trimmedName = name.trim();
+    const trimmedContent = content.trim();
+
+    if (trimmedName.length > MAX_PROMPT_NAME_LENGTH) {
+      return NextResponse.json({ error: `Prompt name must be ${MAX_PROMPT_NAME_LENGTH} characters or less` }, { status: 400 });
+    }
+    if (trimmedContent.length > MAX_PROMPT_CONTENT_LENGTH) {
+      return NextResponse.json({ error: `Prompt content must be ${MAX_PROMPT_CONTENT_LENGTH} characters or less` }, { status: 400 });
+    }
+
     const result = await db.collection('system_prompts').insertOne({
-      name: name.trim(),
-      content: content.trim(),
+      name: trimmedName,
+      content: trimmedContent,
       updatedAt: new Date()
     });
 
@@ -68,9 +81,19 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "ID, name and content required" }, { status: 400 });
     }
 
+    const trimmedName = name.trim();
+    const trimmedContent = content.trim();
+
+    if (trimmedName.length > MAX_PROMPT_NAME_LENGTH) {
+      return NextResponse.json({ error: `Prompt name must be ${MAX_PROMPT_NAME_LENGTH} characters or less` }, { status: 400 });
+    }
+    if (trimmedContent.length > MAX_PROMPT_CONTENT_LENGTH) {
+      return NextResponse.json({ error: `Prompt content must be ${MAX_PROMPT_CONTENT_LENGTH} characters or less` }, { status: 400 });
+    }
+
     await db.collection('system_prompts').updateOne(
       { _id: new ObjectId(id) },
-      { $set: { name: name.trim(), content: content.trim(), updatedAt: new Date() } }
+      { $set: { name: trimmedName, content: trimmedContent, updatedAt: new Date() } }
     );
 
     return NextResponse.json({ success: true });

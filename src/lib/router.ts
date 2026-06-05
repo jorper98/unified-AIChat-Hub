@@ -29,6 +29,7 @@ When classifying as "image_generation", also provide an "imagePrompt" field with
 Rules:
 - Follow-up messages that reference prior context may still need web search if the topic requires real-time data
 - When the user asks about familiarity or knowledge of a specific topic/person/thing, prefer "web_search" to verify current information
+- Do NOT route to "web_search" for simple time, date, or day-of-week questions (e.g., "what time is it", "what day is today", "what's the date"). These are already answered by the system context injection and should go to "direct_reply"
 - Keep search queries concise and specific
 - Only output valid JSON matching the schema`;
 

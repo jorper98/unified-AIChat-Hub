@@ -95,6 +95,12 @@ export default function SettingsPage() {
   const [globalSystemPrompt, setGlobalSystemPrompt] = useState('');
   const [routerModel, setRouterModel] = useState('openai/gpt-4o-mini');
   const [imageGenerationModel, setImageGenerationModel] = useState('google/gemini-3.1-flash-image-preview');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -272,7 +278,7 @@ export default function SettingsPage() {
       })
     });
     setSaving(false);
-    alert('Settings saved successfully!');
+    showToast('Settings saved successfully!');
   }
 
   const getProviderName = (providerId: string) => {
@@ -407,7 +413,7 @@ export default function SettingsPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e: any) {
-      alert('Backup failed: ' + e.message);
+      showToast('Backup failed: ' + e.message, 'error');
     } finally {
       setBackuping(false);
     }
@@ -467,6 +473,15 @@ export default function SettingsPage() {
 
   return (
     <main className="min-h-screen font-sans bg-gray-900 text-gray-100">
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg border shadow-xl text-sm font-medium transition-all ${
+          toast.type === 'success'
+            ? 'bg-green-900/90 border-green-700 text-green-200'
+            : 'bg-red-900/90 border-red-700 text-red-200'
+        }`}>
+          {toast.message}
+        </div>
+      )}
       <div className="flex h-screen">
         {/* Left Sidebar Navigation */}
         <div className="w-48 bg-gray-950 border-r border-gray-800 flex flex-col">

@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.1.8
+- Added Settings modal in About page to display current configuration (Models, Providers, Utility LLMs, Global System Prompt, Theme, and Chat/Archive statistics)
+
 ## v0.1.7
 - Utility LLMs Settings Section: configurable Router LLM and Image Generation LLM via settings UI
 - Image Generation Routing: router classifies intent as image_generation and calls dedicated image model

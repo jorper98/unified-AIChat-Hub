@@ -59,8 +59,8 @@ export async function buildSystemContext(messageContent: string): Promise<string
   const dateStr = dateFormatter.format(now);
   const timeStr = timeFormatter.format(now);
 
-  let context = `Current date: Wednesday, June 3, 2026.
-Current date and time: ${dateStr} at ${timeStr}.`;
+  let context = `Current date and time: ${dateStr}.
+When the user asks about the time, date, or day of week, use the current date and time provided above as the authoritative answer. Do NOT say you lack access to real-time information — you have it right here.`;
 
   if (defaultWeatherLocation && isWeatherRelated(messageContent)) {
     const targetLocation = extractWeatherLocation(messageContent, defaultWeatherLocation);
