@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.0
+- Refactored monolithic 1273-line main page component into 11 focused, modular components for improved maintainability and readability
+- Extracted shared TypeScript interfaces into `src/types.ts` and utility functions into `src/lib/utils.ts`
+- Decomposed UI into dedicated components: `ThreadSidebar`, `MessageArea`, `ChatInput`, `PromptModal`, `ArchiveModal`, `DeleteConfirmModal`, `AboutModal`, `ReadmeModal`, and `SettingsModal`
+- Reduced main `page.tsx` file size by ~45% (down to 702 lines) while preserving all existing functionality and state management
+
 ## v0.1.9
 - Added thread and message pagination with configurable limits (25, 50, 100) and "Load More" UI controls to improve performance and reduce memory usage
 - Fixed MongoDB connection race condition by implementing a promise-based connection lock to prevent duplicate connections under concurrent load

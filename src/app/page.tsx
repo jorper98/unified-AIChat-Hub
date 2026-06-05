@@ -1,66 +1,21 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
-import { MarkdownRenderer } from './components/MarkdownRenderer';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { CostCalculator } from './components/CostCalculator';
 import { RawDataModal } from './components/RawDataModal';
+import { ThreadSidebar } from './components/ThreadSidebar';
+import { MessageArea } from './components/MessageArea';
+import { ChatInput } from './components/ChatInput';
+import { PromptModal } from './components/PromptModal';
+import { ArchiveModal } from './components/ArchiveModal';
+import { DeleteConfirmModal } from './components/DeleteConfirmModal';
+import { AboutModal } from './components/AboutModal';
+import { ReadmeModal } from './components/ReadmeModal';
+import { SettingsModal } from './components/SettingsModal';
 import { estimateTokens, formatTokenCount, MODEL_CONTEXT_LIMITS, MODEL_PRICING } from '@/lib/tokens';
+import { ChatTurn, ThreadSummary, ThreadMetadata, DropdownModel, SavedPrompt } from '@/types';
 
-const APP_VERSION = '0.1.9';
-
-interface ChatTurn {
-  role: 'user' | 'assistant';
-  content: string;
-  modelUsed?: string;
-  promptName?: string;
-  systemInstruction?: string;
-  perplexityUsed?: boolean;
-  routingTool?: string;
-  usage?: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-    imageTokens?: number;
-    actualCost?: number;
-    perplexityTokens?: number;
-    perplexityCost?: number;
-    routerTokens?: number;
-    routerCost?: number;
-    imageGenTokens?: number;
-    imageGenCost?: number;
-    imageGenModel?: string;
-  };
-}
-
-interface ThreadSummary {
-  _id: string;
-  name: string;
-  currentModel: string;
-  updatedAt?: string;
-}
-
-interface ThreadMetadata {
-  id: string;
-  name: string;
-  currentModel: string;
-  systemInstruction: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface DropdownModel {
-  id: string;
-  name: string;
-}
-
-interface SavedPrompt {
-  _id: string;
-  name: string;
-  content: string;
-}
+const APP_VERSION = '0.2.0';
 
 const MASTER_NAME_MAP: Record<string, string> = {
   'openai/gpt-4o': 'GPT-4o (OpenAI)',
@@ -100,6 +55,7 @@ export default function UnifiedChatInterface() {
     const saved = localStorage.getItem('theme') as 'dark' | 'light' | null;
     if (saved) setTheme(saved);
   }, []);
+  
   const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
   const [selectedPromptName, setSelectedPromptName] = useState('');
   const [showRawData, setShowRawData] = useState(false);
@@ -120,7 +76,6 @@ export default function UnifiedChatInterface() {
   const [bypassRouter, setBypassRouter] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
-  // Pagination state
   const [threadsLimit, setThreadsLimit] = useState(25);
   const [threadsSkip, setThreadsSkip] = useState(0);
   const [hasMoreThreads, setHasMoreThreads] = useState(true);
@@ -138,7 +93,6 @@ export default function UnifiedChatInterface() {
 
   const isDark = mounted ? theme === 'dark' : true;
 
-  // 1. Initial Load: Get dropdown models and sidebar threads
   useEffect(() => {
     fetch('/api/settings')
       .then(res => res.json())
@@ -212,7 +166,6 @@ export default function UnifiedChatInterface() {
     }
   }, [showSettingsModal]);
 
-  // 2. Fetch/Search Threads for the Sidebar
   const refreshThreads = (search = '', skip = 0, isLoadMore = false) => {
     const url = search 
       ? `/api/threads?q=${encodeURIComponent(search)}&limit=${threadsLimit}&skip=${skip}` 
@@ -238,16 +191,14 @@ export default function UnifiedChatInterface() {
     refreshThreads(searchQuery, newSkip, true);
   };
 
-  // Trigger search filtering when user types
   useEffect(() => {
-    setThreadsSkip(0); // Reset skip when search query changes
+    setThreadsSkip(0);
     const delayDebounce = setTimeout(() => {
       refreshThreads(searchQuery, 0, false);
-    }, 300); // 300ms debounce to prevent spamming database on every keystroke
+    }, 300);
     return () => clearTimeout(delayDebounce);
   }, [searchQuery]);
 
-  // Persist active thread ID
   useEffect(() => {
     if (threadId) {
       localStorage.setItem('activeThreadId', threadId);
@@ -256,12 +207,11 @@ export default function UnifiedChatInterface() {
     }
   }, [threadId]);
 
-  // 3. Load a selected past thread context into view
   const loadThread = (id: string, skip = 0, isLoadMore = false) => {
     if (!isLoadMore) {
       setLoading(true);
       setThreadId(id);
-      setMessagesSkip(0); // Reset message skip when loading a new thread
+      setMessagesSkip(0);
     }
     
     fetch(`/api/threads/${id}/messages?limit=${messagesLimit}&skip=${skip}`)
@@ -283,7 +233,6 @@ export default function UnifiedChatInterface() {
             setMessages(prev => [...mappedMessages, ...prev]);
           } else {
             setMessages(mappedMessages);
-            // Restore the last used prompt name from messages
             const lastMessageWithPrompt = mappedMessages.findLast((m: ChatTurn) => m.promptName);
             if (lastMessageWithPrompt && lastMessageWithPrompt.promptName) {
               setSelectedPromptName(lastMessageWithPrompt.promptName);
@@ -293,7 +242,6 @@ export default function UnifiedChatInterface() {
         }
         if (data.thread) {
           setThreadMetadata(data.thread);
-          // Restore the system prompt from thread metadata
           if (data.thread.systemInstruction) {
             setSystemPrompt(data.thread.systemInstruction);
           }
@@ -315,23 +263,6 @@ export default function UnifiedChatInterface() {
     setInput('');
   };
 
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
-  };
-
   const startRename = (thread: ThreadSummary) => {
     setRenamingThread(thread._id);
     setRenameValue(thread.name);
@@ -339,14 +270,12 @@ export default function UnifiedChatInterface() {
 
   const saveRename = async (id: string) => {
     if (!renameValue.trim()) return;
-    
     try {
       const res = await fetch(`/api/threads/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: renameValue })
       });
-      
       if (res.ok) {
         setThreadsList(prev => prev.map(t => 
           t._id === id ? { ...t, name: renameValue } : t
@@ -613,399 +542,87 @@ export default function UnifiedChatInterface() {
 
   return (
     <main className={`flex h-screen font-sans ${isDark ? 'bg-gray-900 text-gray-100' : 'bg-gray-50 text-gray-900'}`}>
-      {/* Control Panel Panel Sidebar Container */}
-      <section className={`w-80 p-4 flex flex-col gap-4 border-r h-full pb-8 ${isDark ? 'bg-gray-950 border-gray-800' : 'bg-white border-gray-200'}`}>
-        <div className="flex justify-between items-start gap-2">
-          <div>
-            <h1 className="text-md font-bold text-indigo-400">Unified Chat Hub</h1>
-            <span className={`text-[9px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>v{APP_VERSION}</span>
-          </div>
-          <div className="flex items-center gap-1 pt-0.5">
-            <button
-              onClick={() => setShowAbout(true)}
-              className={`p-1.5 rounded transition ${isDark ? 'text-gray-500 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'}`}
-              title="About"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
-            <button
-              onClick={toggleTheme}
-              className={`p-1.5 rounded transition ${isDark ? 'text-gray-500 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'}`}
-              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {isDark ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                </svg>
-              )}
-            </button>
-            <Link href="/settings" className={`p-1.5 rounded transition ${isDark ? 'text-gray-500 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'}`} title="Settings">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </Link>
-            <button
-              onClick={() => window.open('/logs', 'serverLogs', 'width=1200,height=800,scrollbars=yes,resizable=yes')}
-              className={`p-1.5 rounded transition ${isDark ? 'text-gray-500 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'}`}
-              title="Server Logs (new window)"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </button>
-          </div>
-        </div>
+      <ThreadSidebar
+        threadsList={threadsList}
+        searchQuery={searchQuery}
+        threadId={threadId}
+        renamingThread={renamingThread}
+        renameValue={renameValue}
+        isDark={isDark}
+        hasMoreThreads={hasMoreThreads}
+        threadsLimit={threadsLimit}
+        setSearchQuery={setSearchQuery}
+        setRenamingThread={setRenamingThread}
+        setRenameValue={setRenameValue}
+        setThreadsLimit={setThreadsLimit}
+        setThreadsSkip={setThreadsSkip}
+        loadThread={loadThread}
+        startRename={startRename}
+        saveRename={saveRename}
+        cancelRename={cancelRename}
+        archiveThread={archiveThread}
+        setDeleteConfirmId={setDeleteConfirmId}
+        loadMoreThreads={loadMoreThreads}
+        refreshThreads={refreshThreads}
+        setShowArchives={setShowArchives}
+        loadArchivedThreads={() => loadArchivedThreads(0, false)}
+        startNewChat={startNewChat}
+        APP_VERSION={APP_VERSION}
+        toggleTheme={toggleTheme}
+        setShowAbout={setShowAbout}
+      />
 
-        <button 
-          onClick={startNewChat}
-          className={`w-full text-xs font-semibold py-2 rounded border transition ${isDark ? 'bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border-indigo-500/30' : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border-indigo-200'}`}
-        >
-          + Start New Thread
-        </button>
-        
-        <hr className={isDark ? 'border-gray-800' : 'border-gray-200'} />
-
-        {/* Global Search Bar Segment */}
-        <div className="flex flex-col gap-1">
-          <div className="flex justify-between items-center">
-            <label className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Search History logs</label>
-            <button
-              onClick={() => { setShowArchives(true); loadArchivedThreads(); }}
-              className={`text-[10px] px-1.5 py-0.5 rounded transition ${isDark ? 'text-gray-500 hover:text-indigo-400' : 'text-gray-400 hover:text-indigo-600'}`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 inline mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
-              </svg> Archives
-            </button>
-          </div>
-          <input 
-            type="text"
-            placeholder="Search keywords inside chats..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className={`w-full border rounded px-2 py-1 text-xs focus:outline-none focus:border-indigo-500 ${isDark ? 'bg-gray-900 border-gray-800 text-gray-200' : 'bg-gray-100 border-gray-300 text-gray-900'}`}
-          />
-        </div>
-
-        {/* Scrollable Thread History Sidebar List Viewport */}
-        <div className="flex-1 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-          {threadsList.map((t) => (
-            <div
-              key={t._id}
-              className={`w-full p-2 rounded text-xs transition border flex flex-col gap-0.5 group ${
-                threadId === t._id 
-                  ? (isDark ? 'bg-indigo-950/40 border-indigo-500/40 text-indigo-200' : 'bg-indigo-50 border-indigo-200 text-indigo-700') 
-                  : (isDark ? 'bg-gray-900/30 border-transparent hover:bg-gray-900/60 text-gray-400 hover:text-gray-200' : 'bg-gray-50 border-transparent hover:bg-gray-100 text-gray-600 hover:text-gray-900')
-              }`}
-            >
-              {renamingThread === t._id ? (
-                <div className="flex flex-col gap-1">
-                  <input
-                    type="text"
-                    value={renameValue}
-                    onChange={(e) => setRenameValue(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') saveRename(t._id);
-                      if (e.key === 'Escape') cancelRename();
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    className={`w-full border rounded px-1.5 py-0.5 text-xs focus:outline-none ${isDark ? 'bg-gray-800 border-indigo-500 text-white' : 'bg-white border-indigo-400 text-gray-900'}`}
-                    autoFocus
-                  />
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => saveRename(t._id)}
-                      className={`text-[9px] px-1.5 py-0.5 rounded ${isDark ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-indigo-500 hover:bg-indigo-600 text-white'}`}
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => cancelRename()}
-                      className={`text-[9px] px-1.5 py-0.5 rounded ${isDark ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-300 hover:bg-gray-400 text-gray-700'}`}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="flex justify-between items-start gap-1">
-                    <span className="font-medium truncate flex-1 cursor-pointer" onClick={() => loadThread(t._id)}>
-                      {t.name}
-                    </span>
-                    <div className="flex gap-0.5">
-                      <button
-                        onClick={() => startRename(t)}
-                        className={`text-[9px] opacity-0 group-hover:opacity-100 transition-opacity p-0.5 ${isDark ? 'text-gray-600 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
-                        title="Rename thread"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => archiveThread(t._id)}
-                        className={`text-[9px] opacity-0 group-hover:opacity-100 transition-opacity p-0.5 ${isDark ? 'text-gray-600 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
-                        title="Archive thread"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => setDeleteConfirmId(t._id)}
-                        className={`text-[9px] opacity-0 group-hover:opacity-100 transition-opacity p-0.5 ${isDark ? 'text-gray-600 hover:text-red-400' : 'text-gray-400 hover:text-red-500'}`}
-                        title="Delete thread"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                   <span className={`text-[9px] font-mono block truncate ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                    ID: {t._id}
-                  </span>
-                  {t.updatedAt && (
-                     <span className={`text-[9px] block truncate ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
-                      {formatDate(t.updatedAt)}
-                    </span>
-                  )}
-                </>
-              )}
-            </div>
-          ))}
-          
-          {/* Pagination Controls for Threads */}
-          <div className="pt-2 flex flex-col gap-2 border-t border-gray-800/50">
-            <div className="flex items-center justify-between">
-              <span className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Show per page:</span>
-              <select 
-                value={threadsLimit} 
-                onChange={(e) => {
-                  const newLimit = parseInt(e.target.value, 10);
-                  setThreadsLimit(newLimit);
-                  setThreadsSkip(0);
-                  refreshThreads(searchQuery, 0, false);
-                }}
-                className={`text-[10px] border rounded px-1 py-0.5 focus:outline-none ${isDark ? 'bg-gray-900 border-gray-700 text-gray-300' : 'bg-white border-gray-300 text-gray-700'}`}
-              >
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-            </div>
-            {hasMoreThreads && (
-              <button
-                onClick={loadMoreThreads}
-                className={`w-full text-xs font-semibold py-1.5 rounded border transition ${isDark ? 'bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-300'}`}
-              >
-                Load More Threads
-              </button>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* Primary Conversation Stream Panel */}
-      <section className={`flex-1 flex flex-col h-full pb-8 ${isDark ? '' : ''}`}>
+      <div className="flex-1 flex flex-col h-full pb-8">
         {errorMessage && (
           <div className={`mx-8 mt-4 p-3 rounded border flex justify-between items-center ${isDark ? 'bg-red-900/30 border-red-700 text-red-200' : 'bg-red-50 border-red-200 text-red-700'}`}>
             <span className="text-sm">{errorMessage}</span>
             <button onClick={() => setErrorMessage(null)} className="text-xs font-bold px-2 py-1 hover:opacity-75">✕</button>
           </div>
         )}
-        <div className="flex-1 overflow-y-auto p-8 space-y-6">
-          {hasMoreMessages && messages.length > 0 && (
-            <div className="flex justify-center mb-4">
-              <button
-                onClick={loadOlderMessages}
-                className={`text-xs font-semibold py-2 px-4 rounded border transition ${isDark ? 'bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-300'}`}
-              >
-                Load Older Messages
-              </button>
-            </div>
-          )}
-          {messages.length === 0 ? (
-            <div className={`h-full flex items-center justify-center text-sm ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-              Initialize a prompt stream or choose an active thread sidebar historical record.
-            </div>
-          ) : (
-            messages.map((msg, idx) => (
-              <div key={idx} className={`max-w-3xl mx-auto flex flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                <div className={`px-4 py-3 rounded-lg text-sm leading-relaxed ${
-                  msg.role === 'user' 
-                    ? (isDark ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-indigo-500 text-white rounded-br-none') 
-                    : (isDark ? 'bg-gray-800 text-gray-200 rounded-bl-none' : 'bg-gray-700 text-gray-100 rounded-bl-none')
-                }`}>
-                  <MarkdownRenderer content={msg.content} isUser={msg.role === 'user'} />
-                </div>
-                {msg.modelUsed && (
-                  <div className={`text-[10px] font-mono px-1 mt-0.5 space-y-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                    <span>
-                      Generated via: {msg.modelUsed.split('/')[1] || msg.modelUsed}{msg.promptName ? ` (${msg.promptName})` : ''}
-                      {msg.routingTool === 'web_search' && ' | web_search (Perplexity)'}
-                      {msg.routingTool && msg.routingTool.includes('/') && ` | image (${msg.routingTool.split('/')[1]})`}
-                      {msg.routingTool === 'direct' && ' | direct'}
-                      {msg.perplexityUsed && !msg.routingTool && ' | Perplexity'}
-                      {!msg.routingTool && msg.usage?.routerTokens && msg.usage.routerTokens > 0 && ' | direct'}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-          {loading && (
-            <div className={`max-w-3xl mx-auto text-xs font-mono animate-pulse ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>
-              Accessing target dataset records...
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+        
+        <MessageArea
+          messages={messages}
+          loading={loading}
+          isDark={isDark}
+          hasMoreMessages={hasMoreMessages}
+          loadOlderMessages={loadOlderMessages}
+          messagesEndRef={messagesEndRef}
+        />
 
-        <div className={`p-4 border-t ${isDark ? 'bg-gray-950/80 border-gray-800' : 'bg-white/80 border-gray-200'}`}>
-          <div className="max-w-3xl mx-auto flex flex-col gap-3">
-            <div className={`flex items-center justify-between text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-              <span>Context: {formatTokenCount(totalTokens)} / {formatTokenCount(contextLimit)} ({usagePercent}%)</span>
-              <div className="flex gap-3">
-                <span>Input: ~{formatTokenCount(inputTokens)} ({input.length} chars)</span>
-                <span>Thread: ~{formatTokenCount(threadTokens)} ({messages.reduce((sum, msg) => sum + (msg.content?.length || 0), 0)} chars, {messages.length} msgs)
-                  <CostCalculator messages={messages} />
-                </span>
-              </div>
-            </div>
-            <div className={`w-full rounded-full h-1 ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}>
-              <div 
-                className={`h-1 rounded-full transition-all ${usagePercent > 90 ? 'bg-red-500' : usagePercent > 70 ? 'bg-yellow-500' : 'bg-indigo-500'}`}
-                style={{ width: `${usagePercent}%` }}
-              />
-            </div>
-            <div className="flex gap-3 items-start">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                placeholder="Ask anything, switch models dynamically mid-chat..."
-                className="flex-1 bg-gray-900 border border-gray-700 rounded px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 text-gray-100"
-              />
-              <button
-                onClick={() => setShowRawData(true)}
-                className={`border px-3 py-3 rounded text-sm font-semibold transition shrink-0 ${isDark ? 'border-gray-700 text-gray-400 hover:text-white hover:border-gray-500' : 'border-gray-300 text-gray-500 hover:text-gray-700 hover:border-gray-400'}`}
-                title="View raw thread data"
-              >
-                {'{ }'}
-              </button>
-              <label className={`flex items-center gap-1.5 px-3 py-3 rounded border cursor-pointer shrink-0 transition ${bypassRouter ? (isDark ? 'border-indigo-500/50 bg-indigo-950/30 text-indigo-300' : 'border-indigo-400 bg-indigo-50 text-indigo-600') : (isDark ? 'border-gray-700 text-gray-400 hover:text-white hover:border-gray-500' : 'border-gray-300 text-gray-500 hover:text-gray-700 hover:border-gray-400')}`} title="Skip router, send directly to LLM">
-                <input
-                  type="checkbox"
-                  checked={bypassRouter}
-                  onChange={(e) => setBypassRouter(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className={`w-4 h-4 rounded border flex items-center justify-center transition ${bypassRouter ? (isDark ? 'bg-indigo-600 border-indigo-500' : 'bg-indigo-500 border-indigo-400') : (isDark ? 'border-gray-600 bg-gray-800' : 'border-gray-300 bg-gray-100')}`}>
-                  {bypassRouter && (
-                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </div>
-                <span className="text-xs font-semibold whitespace-nowrap">LLM Only</span>
-              </label>
-              <button
-                onClick={handleSend}
-                disabled={loading}
-                className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-800 disabled:text-gray-600 text-white px-6 py-3 rounded text-sm font-semibold transition shrink-0"
-              >
-                Dispatch
-              </button>
-            </div>
-            <div className="flex gap-3">
-              <div className="flex-1 flex flex-col gap-1">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-semibold uppercase text-gray-500 tracking-wider">Active Model</label>
-                  {MODEL_PRICING[model] && (
-                    <span className={`text-[9px] font-mono ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
-                      ${MODEL_PRICING[model].input.toFixed(2)} in / ${MODEL_PRICING[model].output.toFixed(2)} out per 1M
-                    </span>
-                  )}
-                </div>
-                <select 
-                  value={model} 
-                  onChange={(e) => setModel(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
-                >
-                  {availableModels.map(m => (
-                    <option key={m.id} value={m.id} className="bg-gray-900 text-white">{m.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex-[2] flex flex-col gap-1">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-semibold uppercase text-gray-500 tracking-wider">System Instructions</label>
-                  <div className="flex gap-1 items-center">
-                    {selectedPromptName && (
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded ${isDark ? 'bg-indigo-900/40 text-indigo-300' : 'bg-indigo-100 text-indigo-700'}`}>
-                        Active: {selectedPromptName}
-                      </span>
-                    )}
-                    <button
-                      onClick={() => setShowSavePrompt(!showSavePrompt)}
-                      className={`text-[9px] px-1.5 py-0.5 rounded border transition ${isDark ? 'text-gray-400 border-gray-700 hover:text-gray-200' : 'text-gray-500 border-gray-300 hover:text-gray-700'}`}
-                      title="Save current prompt"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 inline mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                      </svg> Save
-                    </button>
-                  </div>
-                </div>
-                {showSavePrompt && (
-                  <div className="flex gap-1 mb-1">
-                    <input
-                      type="text"
-                      value={promptName}
-                      onChange={(e) => setPromptName(e.target.value)}
-                      placeholder="Prompt name..."
-                      className={`flex-1 border rounded px-1.5 py-1 text-xs focus:outline-none ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-                    />
-                    <button onClick={saveCurrentPrompt} className="text-[9px] bg-indigo-600 text-white px-2 py-1 rounded">OK</button>
-                  </div>
-                )}
-                <div className="flex gap-1">
-                  <textarea 
-                    value={systemPrompt}
-                    onChange={(e) => setSystemPrompt(e.target.value)}
-                    rows={1}
-                    className={`flex-1 border rounded px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500 resize-none ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-                    placeholder="You are a helpful assistant."
-                  />
-                  {savedPrompts.length > 0 && (
-                    <button
-                      onClick={() => setShowPromptModal(true)}
-                      className={`border rounded px-2 py-1.5 text-xs shrink-0 ${isDark ? 'bg-gray-900 border-gray-700 text-gray-400 hover:text-gray-200' : 'bg-gray-100 border-gray-300 text-gray-600 hover:text-gray-800'}`}
-                      title="Load saved prompt"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+        <ChatInput
+          input={input}
+          loading={loading}
+          model={model}
+          availableModels={availableModels}
+          systemPrompt={systemPrompt}
+          selectedPromptName={selectedPromptName}
+          showSavePrompt={showSavePrompt}
+          promptName={promptName}
+          savedPrompts={savedPrompts}
+          bypassRouter={bypassRouter}
+          isDark={isDark}
+          messages={messages}
+          totalTokens={totalTokens}
+          contextLimit={contextLimit}
+          usagePercent={usagePercent}
+          inputTokens={inputTokens}
+          inputLength={input.length}
+          threadTokens={threadTokens}
+          threadChars={messages.reduce((sum, msg) => sum + (msg.content?.length || 0), 0)}
+          messagesCount={messages.length}
+          setInput={setInput}
+          handleSend={handleSend}
+          setModel={setModel}
+          setSystemPrompt={setSystemPrompt}
+          setShowSavePrompt={setShowSavePrompt}
+          setPromptName={setPromptName}
+          saveCurrentPrompt={saveCurrentPrompt}
+          setBypassRouter={setBypassRouter}
+          setShowPromptModal={setShowPromptModal}
+          setShowRawData={setShowRawData}
+        />
+      </div>
 
-      {/* Footer */}
       <footer className={`fixed bottom-0 left-0 right-0 border-t py-2 text-center text-xs ${isDark ? 'bg-gray-950 border-gray-800 text-gray-400' : 'bg-white border-gray-200 text-gray-500'}`}>
         By <a href="https://35sites.com/" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 transition">Jorge Pereira (35sites.com LLC)</a>
       </footer>
@@ -1018,256 +635,66 @@ export default function UnifiedChatInterface() {
         onClose={() => setShowRawData(false)}
       />
 
-      {showPromptModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setShowPromptModal(false)}>
-          <div className="absolute inset-0 bg-black/40" />
-          <div 
-            className={`relative w-full max-w-lg mx-4 mb-16 rounded-lg border shadow-xl ${isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={`flex justify-between items-center p-3 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-              <h3 className={`text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>Load System Prompt</h3>
-              <button onClick={() => setShowPromptModal(false)} className={`text-xs px-2 py-1 rounded ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}></button>
-            </div>
-            <div className="p-3 max-h-80 overflow-y-auto space-y-2">
-              {savedPrompts.map(p => (
-                editingPrompt?.id === p._id ? (
-                  <div key={p._id} className={`p-3 rounded-lg border ${isDark ? 'bg-gray-800 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
-                    <input
-                      type="text"
-                      value={editingPrompt.name}
-                      onChange={(e) => setEditingPrompt({...editingPrompt, name: e.target.value})}
-                      className={`w-full border rounded px-2 py-1 text-xs mb-2 focus:outline-none focus:border-indigo-500 ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-                      placeholder="Prompt name"
-                    />
-                    <textarea
-                      value={editingPrompt.content}
-                      onChange={(e) => setEditingPrompt({...editingPrompt, content: e.target.value})}
-                      rows={3}
-                      className={`w-full border rounded px-2 py-1 text-xs mb-2 focus:outline-none focus:border-indigo-500 resize-none ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-                      placeholder="System instructions..."
-                    />
-                    <div className="flex gap-1 justify-end">
-                      <button onClick={cancelEditPrompt} className={`text-[10px] px-2 py-1 rounded ${isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>Cancel</button>
-                      <button onClick={saveEditedPrompt} className="text-[10px] px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-500">Save</button>
-                    </div>
-                  </div>
-                ) : (
-                  <div key={p._id} className={`p-2.5 rounded-lg border transition ${
-                    selectedPromptName === p.name
-                      ? (isDark ? 'bg-indigo-900/40 border-indigo-500/40' : 'bg-indigo-50 border-indigo-200')
-                      : (isDark ? 'bg-gray-800/50 border-gray-700 hover:bg-gray-800' : 'bg-white border-gray-200 hover:bg-gray-50')
-                  }`}>
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => { loadPrompt(p._id); setShowPromptModal(false); }}>
-                        <div className={`text-xs font-medium ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>{p.name}</div>
-                        <div className={`text-[10px] mt-0.5 line-clamp-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{p.content}</div>
-                      </div>
-                      <div className="flex gap-1 shrink-0">
-                        <button onClick={() => startEditPrompt(p)} className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`} title="Edit">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                        <button onClick={() => deletePrompt(p._id)} className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'text-gray-500 hover:text-red-400' : 'text-gray-400 hover:text-red-500'}`} title="Delete">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      <PromptModal
+        isOpen={showPromptModal}
+        onClose={() => setShowPromptModal(false)}
+        savedPrompts={savedPrompts}
+        selectedPromptName={selectedPromptName}
+        editingPrompt={editingPrompt}
+        isDark={isDark}
+        loadPrompt={loadPrompt}
+        startEditPrompt={startEditPrompt}
+        saveEditedPrompt={saveEditedPrompt}
+        cancelEditPrompt={cancelEditPrompt}
+        deletePrompt={deletePrompt}
+        setEditingPrompt={setEditingPrompt}
+      />
 
-      {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setDeleteConfirmId(null)}>
-          <div className="absolute inset-0 bg-black/60" />
-          <div className={`relative w-full max-w-sm mx-4 rounded-lg border shadow-xl p-5 ${isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`} onClick={(e) => e.stopPropagation()}>
-            <h3 className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>Delete Thread</h3>
-            <p className={`text-xs mb-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>This will permanently delete this thread and all its messages. This cannot be undone.</p>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setDeleteConfirmId(null)} className={`text-xs px-3 py-1.5 rounded ${isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>Cancel</button>
-              <button onClick={() => deleteThread(deleteConfirmId)} className="text-xs px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-500">Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ArchiveModal
+        isOpen={showArchives}
+        onClose={() => setShowArchives(false)}
+        archivedThreads={archivedThreads}
+        isDark={isDark}
+        hasMoreArchivedThreads={hasMoreArchivedThreads}
+        loadThread={loadThread}
+        unarchiveThread={unarchiveThread}
+        setDeleteConfirmId={setDeleteConfirmId}
+        loadMoreArchivedThreads={loadMoreArchivedThreads}
+      />
 
-      {showArchives && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setShowArchives(false)}>
-          <div className="absolute inset-0 bg-black/40" />
-          <div className={`relative w-full max-w-lg mx-4 mb-16 rounded-lg border shadow-xl ${isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`} onClick={(e) => e.stopPropagation()}>
-            <div className={`flex justify-between items-center p-3 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-              <h3 className={`text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>Archived Threads</h3>
-              <button onClick={() => setShowArchives(false)} className={`text-xs px-2 py-1 rounded ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}></button>
-            </div>
-            <div className="p-3 max-h-80 overflow-y-auto space-y-1">
-              {archivedThreads.length === 0 ? (
-                <p className={`text-xs text-center py-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>No archived threads</p>
-              ) : (
-                archivedThreads.map(t => (
-                  <div key={t._id} className={`p-2.5 rounded-lg border flex justify-between items-center ${isDark ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
-                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => { loadThread(t._id); setShowArchives(false); }}>
-                      <div className={`text-xs font-medium truncate ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>{t.name}</div>
-                      <div className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{t.updatedAt ? formatDate(t.updatedAt) : ''}</div>
-                    </div>
-                    <div className="flex gap-1 shrink-0 ml-2">
-                      <button onClick={() => unarchiveThread(t._id)} className={`text-[10px] px-2 py-1 rounded flex items-center gap-1 ${isDark ? 'bg-indigo-900/40 text-indigo-300 hover:bg-indigo-900/60' : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'}`} title="Unarchive">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                        </svg> Unarchive
-                      </button>
-                      <button onClick={() => { setDeleteConfirmId(t._id); setShowArchives(false); }} className={`text-[10px] px-1.5 py-1 rounded ${isDark ? 'text-gray-500 hover:text-red-400' : 'text-gray-400 hover:text-red-500'}`} title="Delete">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-              
-              {/* Pagination Controls for Archived Threads */}
-              {archivedThreads.length > 0 && (
-                <div className="pt-2 mt-2 flex flex-col gap-2 border-t border-gray-800/50">
-                  {hasMoreArchivedThreads && (
-                    <button
-                      onClick={loadMoreArchivedThreads}
-                      className={`w-full text-xs font-semibold py-1.5 rounded border transition ${isDark ? 'bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-300'}`}
-                    >
-                      Load More Archived Threads
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal
+        isOpen={!!deleteConfirmId}
+        onClose={() => setDeleteConfirmId(null)}
+        isDark={isDark}
+        deleteConfirmId={deleteConfirmId}
+        deleteThread={deleteThread}
+      />
 
-      {showAbout && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowAbout(false)}>
-          <div className="absolute inset-0 bg-black/60" />
-          <div className={`relative w-full max-w-lg mx-4 rounded-lg border shadow-xl max-h-[85vh] flex flex-col ${isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`} onClick={(e) => e.stopPropagation()}>
-            <div className={`flex justify-between items-center p-4 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-              <div>
-                <h3 className={`text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>About Unified Chat Hub</h3>
-                <p className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Version {APP_VERSION}</p>
-              </div>
-              <button onClick={() => setShowAbout(false)} className={`text-xs px-2 py-1 rounded ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}></button>
-            </div>
-            <div className={`p-4 overflow-y-auto flex-1 text-xs ${isDark ? 'text-gray-300' : 'text-gray-700'} prose prose-sm max-w-none ${isDark ? 'prose-invert' : ''} prose-headings:text-sm prose-p:text-xs prose-ul:text-xs prose-strong:text-white`}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{aboutContent || 'Loading...'}</ReactMarkdown>
-            </div>
-            <div className={`p-4 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-              <div className="flex items-center justify-between">
-                <p className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                  By Jorge Pereira (35sites.com LLC) · <a href="https://35sites.com" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300">35sites.com</a>
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => { setShowSettingsModal(true); }}
-                    className={`text-[10px] px-2 py-1 rounded border transition ${isDark ? 'border-gray-600 text-gray-400 hover:text-white' : 'border-gray-300 text-gray-500 hover:text-gray-800'}`}
-                    title="View Settings"
-                  >
-                    ⚙️ Settings
-                  </button>
-                  <button
-                    onClick={() => { setShowReadme(true); }}
-                    className={`text-[10px] px-2 py-1 rounded border transition ${isDark ? 'border-gray-600 text-gray-400 hover:text-white' : 'border-gray-300 text-gray-500 hover:text-gray-800'}`}
-                    title="View README"
-                  >
-                    📄 README
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <AboutModal
+        isOpen={showAbout}
+        onClose={() => setShowAbout(false)}
+        aboutContent={aboutContent}
+        isDark={isDark}
+        appVersion={APP_VERSION}
+        setShowReadme={setShowReadme}
+        setShowSettingsModal={setShowSettingsModal}
+      />
 
-      {showReadme && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowReadme(false)}>
-          <div className="absolute inset-0 bg-black/60" />
-          <div className={`relative w-full max-w-3xl mx-4 rounded-lg border shadow-xl max-h-[90vh] flex flex-col ${isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`} onClick={(e) => e.stopPropagation()}>
-            <div className={`flex justify-between items-center p-4 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-              <h3 className={`text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>README</h3>
-              <button onClick={() => setShowReadme(false)} className={`text-xs px-2 py-1 rounded ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}>✕</button>
-            </div>
-            <div className={`p-4 overflow-y-auto flex-1 text-xs ${isDark ? 'text-gray-300' : 'text-gray-700'} prose prose-sm max-w-none ${isDark ? 'prose-invert' : ''} prose-headings:text-sm prose-p:text-xs prose-ul:text-xs prose-strong:text-white`}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{readmeContent || 'Loading...'}</ReactMarkdown>
-            </div>
-          </div>
-        </div>
-      )}
+      <ReadmeModal
+        isOpen={showReadme}
+        onClose={() => setShowReadme(false)}
+        readmeContent={readmeContent}
+        isDark={isDark}
+      />
 
-      {showSettingsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowSettingsModal(false)}>
-          <div className="absolute inset-0 bg-black/60" />
-          <div className={`relative w-full max-w-2xl mx-4 rounded-lg border shadow-xl max-h-[85vh] flex flex-col ${isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`} onClick={(e) => e.stopPropagation()}>
-            <div className={`flex justify-between items-center p-4 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-              <h3 className={`text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>Current Settings</h3>
-              <button onClick={() => setShowSettingsModal(false)} className={`text-xs px-2 py-1 rounded ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}>✕</button>
-            </div>
-            <div className={`p-4 overflow-y-auto flex-1 text-xs space-y-4 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-              {settingsData ? (
-                <>
-                  <div>
-                    <h4 className={`font-semibold mb-1 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>Models</h4>
-                    <ul className="list-disc list-inside space-y-0.5 text-[10px] font-mono">
-                      {settingsData.models?.map((m: any, i: number) => (
-                        <li key={i}>{m.name} ({m.provider})</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className={`font-semibold mb-1 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>Providers</h4>
-                    <ul className="list-disc list-inside space-y-0.5 text-[10px] font-mono">
-                      {settingsData.providers?.map((p: any, i: number) => (
-                        <li key={i}>{p.name} ({p.id})</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className={`font-semibold mb-1 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>Utility LLMs</h4>
-                    <ul className="list-disc list-inside space-y-0.5 text-[10px] font-mono">
-                      <li>Router: {settingsData.routerModel}</li>
-                      <li>Image Generation: {settingsData.imageGenerationModel}</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className={`font-semibold mb-1 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>Global System Prompt</h4>
-                    <p className={`text-[10px] p-2 rounded ${isDark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
-                      {settingsData.globalSystemPrompt || 'None'}
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className={`font-semibold mb-1 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>Theme</h4>
-                    <p className="text-[10px] font-mono">{settingsData.theme || 'dark'}</p>
-                    {settingsData.themeColors && (
-                      <p className="text-[10px] font-mono mt-1">Custom Colors: {JSON.stringify(settingsData.themeColors)}</p>
-                    )}
-                  </div>
-                  <div>
-                    <h4 className={`font-semibold mb-1 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>Statistics</h4>
-                    <ul className="list-disc list-inside space-y-0.5 text-[10px] font-mono">
-                      <li>Total Chats: {threadsList.length}</li>
-                      <li>Total Archives: {archivedThreads.length}</li>
-                    </ul>
-                  </div>
-                </>
-              ) : (
-                <p className="text-center py-4">Loading settings...</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        settingsData={settingsData}
+        isDark={isDark}
+        threadsList={threadsList}
+        archivedThreads={archivedThreads}
+      />
     </main>
   );
 }
