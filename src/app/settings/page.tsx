@@ -434,7 +434,7 @@ export default function SettingsPage() {
     { id: 'models', label: 'Models', icon: '' },
     { id: 'providers', label: 'Providers', icon: '' },
     { id: 'theme', label: 'Theme Colors', icon: '' },
-    { id: 'global-prompt', label: 'Global System Prompt', icon: '🌍' },
+    { id: 'global-prompt', label: 'Global System Prompt', icon: '' },
     { id: 'backup', label: 'Backup & Restore', icon: '' }
   ];
 

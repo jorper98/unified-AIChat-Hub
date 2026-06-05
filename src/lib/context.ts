@@ -59,7 +59,8 @@ export async function buildSystemContext(messageContent: string): Promise<string
   const dateStr = dateFormatter.format(now);
   const timeStr = timeFormatter.format(now);
 
-  let context = `Current date and time: ${dateStr} at ${timeStr}.`;
+  let context = `Current date: Wednesday, June 3, 2026.
+Current date and time: ${dateStr} at ${timeStr}.`;
 
   if (defaultWeatherLocation && isWeatherRelated(messageContent)) {
     const targetLocation = extractWeatherLocation(messageContent, defaultWeatherLocation);
