@@ -96,7 +96,7 @@ export async function classifyIntent(
       body: JSON.stringify({
         model: routerModel,
         messages,
-        max_tokens: 100,
+        max_tokens: 500,
         temperature: 0,
         response_format: {
           type: 'json_schema',
@@ -120,7 +120,7 @@ export async function classifyIntent(
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
+    let content = data.choices?.[0]?.message?.content;
     const usage = data.usage || {};
     const promptTokens = usage.prompt_tokens || 0;
     const completionTokens = usage.completion_tokens || 0;
@@ -131,7 +131,46 @@ export async function classifyIntent(
       return { route: 'direct_reply', promptTokens, completionTokens, cost };
     }
 
-    const result: Omit<RouterResult, 'promptTokens' | 'completionTokens' | 'cost'> = JSON.parse(content);
+    // Robust JSON parsing: strip markdown code blocks and extract the JSON object
+    let cleanContent = content.trim();
+    if (cleanContent.startsWith('```json')) {
+      cleanContent = cleanContent.replace(/^```json\s*/, '').replace(/\s*```$/, '').trim();
+    } else if (cleanContent.startsWith('```')) {
+      cleanContent = cleanContent.replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
+    }
+
+    const firstBrace = cleanContent.indexOf('{');
+    const lastBrace = cleanContent.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      cleanContent = cleanContent.substring(firstBrace, lastBrace + 1);
+    }
+
+    let result: any;
+    try {
+      result = JSON.parse(cleanContent);
+    } catch (parseError: any) {
+      console.error('[Router] JSON parse failed:', parseError.message);
+      console.error('[Router] Raw content snippet:', cleanContent.substring(0, 600));
+      
+      // Fallback: try to salvage image generation intent via regex if JSON is malformed or truncated
+      if (cleanContent.toLowerCase().includes('image_generation') || cleanContent.toLowerCase().includes('image')) {
+        // Match "imagePrompt": "anything, even if the string is truncated and lacks a closing quote
+        const imagePromptMatch = cleanContent.match(/"imagePrompt"\s*:\s*"(.*)/);
+        if (imagePromptMatch) {
+          let prompt = imagePromptMatch[1].trim();
+          // Clean up trailing commas or quotes if partially matched
+          if (prompt.endsWith(',')) prompt = prompt.slice(0, -1);
+          if (prompt.endsWith('"')) prompt = prompt.slice(0, -1);
+          
+          result = { route: 'image_generation', imagePrompt: prompt, searchQuery: '', format: 'full_answer' };
+          console.log('[Router] Fallback: extracted imagePrompt via regex (possibly truncated)');
+        } else {
+          result = { route: 'direct_reply', searchQuery: '', imagePrompt: '', format: 'full_answer' };
+        }
+      } else {
+        result = { route: 'direct_reply', searchQuery: '', imagePrompt: '', format: 'full_answer' };
+      }
+    }
 
     if (result.route !== 'web_search' && result.route !== 'direct_reply' && result.route !== 'image_generation') {
       console.log(`[Router] Invalid route "${result.route}", defaulting to direct_reply`);
