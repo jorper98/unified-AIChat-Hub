@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.1.6
+- Intelligent Intent Router: lightweight GPT-4o Mini classifier routes queries to web_search or direct_reply
+- Structured JSON schema routing with auto-fallback on timeout/error
+- Web search context injection via XML tags (`<web_search_context>`) with source citations
+- Dual Perplexity formats: full_answer (factual queries) and snippets (complex/analytical queries)
+- Perplexity citation markers replaced with clickable markdown links
+- LLM Only mode: checkbox bypass to skip router and all context injection
+- Server Logs: persistent file-based logging to `data/logs/server.log` with auto-rotation
+- Standalone server logs popup window with live auto-refresh, level filtering, and clear
+- Router and Perplexity cost tracking in CostCalculator (routerTokens, routerCost, perplexityTokens, perplexityCost)
+- Cost decimal precision increased to 10 decimal places
+- Date/time anchor injected into system prompt for real-time awareness
+
 ## v0.1.5
 - Auto-continue Perplexity mode: after a recheck, follow-ups automatically go through Perplexity
 - Perplexity mode persists per-thread in MongoDB (survives page reloads)

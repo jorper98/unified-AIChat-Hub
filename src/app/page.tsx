@@ -107,6 +107,9 @@ export default function UnifiedChatInterface() {
   const [archivedThreads, setArchivedThreads] = useState<ThreadSummary[]>([]);
   const [showAbout, setShowAbout] = useState(false);
   const [aboutContent, setAboutContent] = useState('');
+  const [showReadme, setShowReadme] = useState(false);
+  const [readmeContent, setReadmeContent] = useState('');
+  const [bypassRouter, setBypassRouter] = useState(false);
 
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
@@ -167,11 +170,20 @@ export default function UnifiedChatInterface() {
   }, []);
 
   useEffect(() => {
-    fetch('/About.md')
+    fetch('/About.md?t=' + Date.now())
       .then(res => res.text())
       .then(text => setAboutContent(text))
       .catch(() => setAboutContent(''));
   }, []);
+
+  useEffect(() => {
+    if (showReadme) {
+      fetch('/api/readme')
+        .then(res => res.text())
+        .then(text => setReadmeContent(text))
+        .catch(() => setReadmeContent(''));
+    }
+  }, [showReadme]);
 
   // 2. Fetch/Search Threads for the Sidebar
   const refreshThreads = (search = '') => {
@@ -454,7 +466,8 @@ export default function UnifiedChatInterface() {
           messageContent: userText,
           selectedModel: model,
           systemInstruction: systemPrompt,
-          promptName: selectedPromptName || null
+          promptName: selectedPromptName || null,
+          bypassRouter: bypassRouter
         })
       });
 
@@ -518,6 +531,15 @@ export default function UnifiedChatInterface() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </Link>
+            <button
+              onClick={() => window.open('/logs', 'serverLogs', 'width=1200,height=800,scrollbars=yes,resizable=yes')}
+              className={`p-1.5 rounded transition ${isDark ? 'text-gray-500 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'}`}
+              title="Server Logs (new window)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -710,6 +732,22 @@ export default function UnifiedChatInterface() {
               >
                 {'{ }'}
               </button>
+              <label className={`flex items-center gap-1.5 px-3 py-3 rounded border cursor-pointer shrink-0 transition ${bypassRouter ? (isDark ? 'border-indigo-500/50 bg-indigo-950/30 text-indigo-300' : 'border-indigo-400 bg-indigo-50 text-indigo-600') : (isDark ? 'border-gray-700 text-gray-400 hover:text-white hover:border-gray-500' : 'border-gray-300 text-gray-500 hover:text-gray-700 hover:border-gray-400')}`} title="Skip router, send directly to LLM">
+                <input
+                  type="checkbox"
+                  checked={bypassRouter}
+                  onChange={(e) => setBypassRouter(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className={`w-4 h-4 rounded border flex items-center justify-center transition ${bypassRouter ? (isDark ? 'bg-indigo-600 border-indigo-500' : 'bg-indigo-500 border-indigo-400') : (isDark ? 'border-gray-600 bg-gray-800' : 'border-gray-300 bg-gray-100')}`}>
+                  {bypassRouter && (
+                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+                <span className="text-xs font-semibold whitespace-nowrap">LLM Only</span>
+              </label>
               <button
                 onClick={handleSend}
                 disabled={loading}
@@ -922,9 +960,33 @@ export default function UnifiedChatInterface() {
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{aboutContent || 'Loading...'}</ReactMarkdown>
             </div>
             <div className={`p-4 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-              <p className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                By Jorge Pereira (35sites.com LLC) · <a href="https://35sites.com" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300">35sites.com</a>
-              </p>
+              <div className="flex items-center justify-between">
+                <p className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                  By Jorge Pereira (35sites.com LLC) · <a href="https://35sites.com" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300">35sites.com</a>
+                </p>
+                <button
+                  onClick={() => { setShowReadme(true); }}
+                  className={`text-[10px] px-2 py-1 rounded border transition ${isDark ? 'border-gray-600 text-gray-400 hover:text-white' : 'border-gray-300 text-gray-500 hover:text-gray-800'}`}
+                  title="View README"
+                >
+                  📄 README
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showReadme && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowReadme(false)}>
+          <div className="absolute inset-0 bg-black/60" />
+          <div className={`relative w-full max-w-3xl mx-4 rounded-lg border shadow-xl max-h-[90vh] flex flex-col ${isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`} onClick={(e) => e.stopPropagation()}>
+            <div className={`flex justify-between items-center p-4 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+              <h3 className={`text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>README</h3>
+              <button onClick={() => setShowReadme(false)} className={`text-xs px-2 py-1 rounded ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}>✕</button>
+            </div>
+            <div className={`p-4 overflow-y-auto flex-1 text-xs ${isDark ? 'text-gray-300' : 'text-gray-700'} prose prose-sm max-w-none ${isDark ? 'prose-invert' : ''} prose-headings:text-sm prose-p:text-xs prose-ul:text-xs prose-strong:text-white`}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{readmeContent || 'Loading...'}</ReactMarkdown>
             </div>
           </div>
         </div>

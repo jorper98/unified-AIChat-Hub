@@ -5,7 +5,9 @@ import modelConfig from '@/config/models.json';
 import fs from 'fs';
 import path from 'path';
 import { buildSystemContext } from '@/lib/context';
-import { isUncertainResponse, isPerplexityRecheck, isExitPerplexityMode, queryPerplexity } from '@/lib/perplexity';
+import { isUncertainResponse, isPerplexityRecheck, isExitPerplexityMode, queryPerplexity, queryPerplexityForSnippets } from '@/lib/perplexity';
+import { classifyIntent, RouterResult } from '@/lib/router';
+import { logToServer } from '@/lib/logger';
 
 const IMAGES_DIR = path.join(process.cwd(), 'public', 'images');
 
@@ -119,7 +121,9 @@ async function getProviderForModel(modelId: string) {
 
 export async function POST(request: Request) {
   try {
-    const { threadId, messageContent, selectedModel, systemInstruction, promptName } = await request.json();
+    const { threadId, messageContent, selectedModel, systemInstruction, promptName, bypassRouter } = await request.json();
+    console.log(`[Chat] bypassRouter=${bypassRouter}, message="${messageContent.substring(0, 50)}..."`);
+    logToServer(`POST /api/chat model=${selectedModel} bypassRouter=${bypassRouter}, message="${messageContent.substring(0, 80)}..."`);
     const db = await getDb();
     
     const activeThreadId = threadId ? new ObjectId(threadId) : new ObjectId();
@@ -172,10 +176,18 @@ export async function POST(request: Request) {
       content: msg.content
     }));
 
-    const dynamicContext = await buildSystemContext(messageContent);
-
+    const dynamicContextRaw = await buildSystemContext(messageContent);
     const settings = await db.collection('settings').findOne({ _id: 'global_settings' as any });
-    const globalPrompt = settings?.globalSystemPrompt || '';
+    // Skip all context (date/time + global prompt) when bypassing router (LLM Only mode)
+    const dynamicContext = bypassRouter ? '' : dynamicContextRaw;
+    const globalPrompt = bypassRouter ? '' : (settings?.globalSystemPrompt || '');
+    if (bypassRouter) {
+      console.log('[Chat] LLM Only mode: All context injection skipped');
+      logToServer('LLM Only mode: All context injection skipped', 'info');
+    }
+
+    let routerResult: RouterResult | null = null;
+    let webSearchContext: string | null = null;
 
     if (dynamicContext || globalPrompt) {
       let globalMessage = '';
@@ -212,10 +224,73 @@ export async function POST(request: Request) {
     let aiTextOutput = "";
     let usage: any = {};
 
+    // Router integration: classify intent before main LLM call
+    // Skip router when in Perplexity mode, explicit Perplexity recheck, or user requested LLM-only
+    if (!inPerplexityMode && !exitingPerplexityMode && !isPerplexityRecheck(messageContent) && !bypassRouter) {
+      const historyForRouter = rawHistory
+        .filter(msg => msg.role === 'user' || msg.role === 'assistant')
+        .map(msg => ({ role: msg.role as 'user' | 'assistant', content: msg.content }));
+
+      routerResult = await classifyIntent(messageContent, historyForRouter);
+
+      // Execute web search if router classified it as web_search
+      if (routerResult.route === 'web_search' && routerResult.searchQuery) {
+        console.log(`[Router] Web search triggered: "${routerResult.searchQuery}" (format: ${routerResult.format})`);
+        logToServer(`Router web_search model=${selectedModel}: "${routerResult.searchQuery}" (format: ${routerResult.format})`, 'info');
+
+        if (routerResult.format === 'full_answer') {
+          const perplexityResult = await queryPerplexity(routerResult.searchQuery, historyForRouter);
+          if (perplexityResult) {
+            webSearchContext = `<web_search_context>\n<answer>${perplexityResult.answer}</answer>\n</web_search_context>`;
+            perplexityUsage = {
+              promptTokens: perplexityResult.promptTokens,
+              completionTokens: perplexityResult.completionTokens,
+              totalTokens: perplexityResult.promptTokens + perplexityResult.completionTokens,
+              actualCost: perplexityResult.cost,
+            };
+          }
+        } else if (routerResult.format === 'snippets') {
+          const snippetsResult = await queryPerplexityForSnippets(routerResult.searchQuery);
+          if (snippetsResult) {
+            const snippetLines = snippetsResult.snippets.split('\n').map((line, idx) => {
+              if (line.trim().match(/^\d+\./)) return `<snippet number="${idx + 1}">${line}</snippet>`;
+              return line;
+            });
+            const sourceTags = snippetsResult.citations.map(url => `    <source url="${url}" />`).join('\n');
+            webSearchContext = `<web_search_context>\n${snippetLines.join('\n')}\n<sources>\n${sourceTags}\n</sources>\n</web_search_context>`;
+            perplexityUsage = {
+              promptTokens: snippetsResult.promptTokens,
+              completionTokens: snippetsResult.completionTokens,
+              totalTokens: snippetsResult.promptTokens + snippetsResult.completionTokens,
+              actualCost: snippetsResult.cost,
+            };
+          }
+        }
+      }
+    }
+
+    // Inject web search context as a system message if available
+    if (webSearchContext) {
+      formattedHistory.unshift({
+        role: 'system',
+        content: webSearchContext
+      });
+    }
+
+    // Add citation instruction when web search context was injected
+    if (webSearchContext && routerResult) {
+      const citationInstruction: { role: 'system'; content: string } = {
+        role: 'system',
+        content: `You have access to web search results wrapped in <web_search_context> tags. Use this information to provide accurate, up-to-date responses. Always cite your sources by referencing the source URLs when using search data (e.g., [Source: URL]).`
+      };
+      formattedHistory.unshift(citationInstruction);
+    }
+
     // Priority: exit trigger > auto-continue mode > recheck trigger > normal model
     if (inPerplexityMode && !exitingPerplexityMode) {
       // Auto-continue: send to Perplexity with conversation history
       console.log('[Perplexity Mode] Active, sending to Perplexity');
+      logToServer(`Perplexity Mode model=${selectedModel} active`, 'info');
       const perplexityHistory = rawHistory
         .filter(msg => msg.role === 'user' || msg.role === 'assistant')
         .map(msg => ({ role: msg.role, content: msg.content }));
@@ -232,6 +307,7 @@ export async function POST(request: Request) {
       }
     } else if (isPerplexityRecheck(messageContent)) {
       console.log('[Perplexity Recheck] Recheck request detected, finding previous user message...');
+      logToServer(`Perplexity Recheck model=${selectedModel} triggered`, 'info');
       // Find the last user message before this current one
       const userMessages = rawHistory.filter(msg => msg.role === 'user');
       const previousUserMessage = userMessages.length > 1 ? userMessages[userMessages.length - 2] : null;
@@ -486,9 +562,10 @@ export async function POST(request: Request) {
     aiTextOutput = extractAndSaveImages(aiTextOutput);
 
     // Check if the model expressed uncertainty — if so, query Perplexity for real-time info
-    // (skip if Perplexity was already used via recheck request)
-    if (!perplexityUsage && isUncertainResponse(aiTextOutput)) {
+    // (skip if Perplexity was already used via recheck request, or if LLM Only mode is active)
+    if (!bypassRouter && !perplexityUsage && isUncertainResponse(aiTextOutput)) {
       console.log('[Perplexity Fallback] Uncertainty detected in model response, querying Perplexity...');
+      logToServer(`Perplexity Fallback model=${selectedModel}: uncertainty detected`, 'warn');
       const perplexityResult = await queryPerplexity(messageContent);
       if (perplexityResult) {
         aiTextOutput = perplexityResult.answer;
@@ -499,6 +576,7 @@ export async function POST(request: Request) {
           actualCost: perplexityResult.cost,
         };
         console.log('[Perplexity Fallback] Replaced uncertain response with Perplexity answer');
+        logToServer('Perplexity Fallback: replaced uncertain response', 'info');
       }
     }
 
@@ -518,6 +596,8 @@ export async function POST(request: Request) {
         actualCost: usage.cost || 0,
         perplexityTokens: perplexityUsage?.totalTokens || 0,
         perplexityCost: perplexityUsage?.actualCost || 0,
+        routerTokens: routerResult ? routerResult.promptTokens + routerResult.completionTokens : 0,
+        routerCost: routerResult ? routerResult.cost : 0,
       },
       createdAt: new Date()
     });
@@ -525,7 +605,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ 
       threadId: activeThreadId.toHexString(), 
       response: aiTextOutput,
-      usage
+      usage: {
+        ...usage,
+        perplexityTokens: perplexityUsage?.totalTokens || 0,
+        perplexityCost: perplexityUsage?.actualCost || 0,
+        routerTokens: routerResult ? routerResult.promptTokens + routerResult.completionTokens : 0,
+        routerCost: routerResult ? routerResult.cost : 0,
+      }
     });
 
   } catch (error: any) {

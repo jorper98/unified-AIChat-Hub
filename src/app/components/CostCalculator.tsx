@@ -16,6 +16,8 @@ interface Message {
     actualCost?: number;
     perplexityTokens?: number;
     perplexityCost?: number;
+    routerTokens?: number;
+    routerCost?: number;
   };
 }
 
@@ -45,6 +47,9 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
     let perplexityOutputTokens = 0;
     let perplexityTotalCost = 0;
     let perplexityCount = 0;
+    let routerTotalTokens = 0;
+    let routerTotalCost = 0;
+    let routerCount = 0;
 
     let cumulativeContext = 0;
 
@@ -71,10 +76,17 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
         cumulativeContext += msgTokens;
 
         // Track Perplexity usage separately
-        if (msg.perplexityUsed && msg.usage?.perplexityCost && msg.usage.perplexityCost > 0) {
+        if (msg.usage?.perplexityCost && msg.usage.perplexityCost > 0) {
           perplexityOutputTokens += msg.usage.perplexityTokens || 0;
           perplexityTotalCost += msg.usage.perplexityCost || 0;
           perplexityCount++;
+        }
+
+        // Track Router usage separately
+        if (msg.usage?.routerCost && msg.usage.routerCost > 0) {
+          routerTotalTokens += msg.usage.routerTokens || 0;
+          routerTotalCost += msg.usage.routerCost || 0;
+          routerCount++;
         }
       }
     }
@@ -135,6 +147,25 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
       });
     }
 
+    // Add Router row if used
+    if (routerCount > 0) {
+      grandTotal += routerTotalCost;
+      results.push({
+        modelId: 'router/gpt-4o-mini',
+        modelName: `Router GPT-4o Mini (${routerCount}×)`,
+        inputTokens: routerTotalTokens,
+        outputTokens: 0,
+        imageTokens: 0,
+        inputCost: 0,
+        outputCost: 0,
+        totalCost: routerTotalCost,
+        hasActualCost: true,
+      });
+    }
+
+    console.log('[CostCalculator] Router tracking:', { routerCount, routerTotalTokens, routerTotalCost });
+    console.log('[CostCalculator] Perplexity tracking:', { perplexityCount, perplexityTotalCost });
+
     return { models: results, grandTotal };
   }, [messages]);
 
@@ -182,7 +213,7 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
                         <td className="py-2 text-right text-gray-500 font-mono">{formatTokenCount(m.inputTokens)}</td>
                         <td className="py-2 text-right text-gray-500 font-mono">{formatTokenCount(m.outputTokens)}</td>
                         <td className="py-2 text-right text-gray-500 font-mono">{m.imageTokens > 0 ? formatTokenCount(m.imageTokens) : '—'}</td>
-                        <td className="py-2 text-right font-mono text-green-400">${m.totalCost.toFixed(6)}</td>
+                        <td className="py-2 text-right font-mono text-green-400">${m.totalCost.toFixed(10)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -192,7 +223,7 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
                       <td className="py-2"></td>
                       <td className="py-2"></td>
                       <td className="py-2"></td>
-                      <td className="py-2 text-right font-mono text-green-400 font-semibold">${modelCosts.grandTotal.toFixed(6)}</td>
+                      <td className="py-2 text-right font-mono text-green-400 font-semibold">${modelCosts.grandTotal.toFixed(10)}</td>
                     </tr>
                   </tfoot>
             </table>

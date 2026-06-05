@@ -8,7 +8,7 @@ This workspace securely anchors conversational prompt stream history and configu
 
 # Release Information
 
-**Current Sandbox Tracking Release:** `v0.1.5`
+**Current Sandbox Tracking Release:** `v0.1.6`
 ---
 
 ## Key Architecture & Features

@@ -7,6 +7,7 @@
       "endpoint": "https://openrouter.ai/api/v1/chat/completions",
       "apiKeyEnv": "OPENROUTER_API_KEY",
       "models": [
+        { "id": "openai/gpt-4o-mini", "name": "GPT-4o Mini (OpenAI)", "default": true },
         { "id": "openai/gpt-4o", "name": "GPT-4o (OpenAI)", "default": true },
         { "id": "anthropic/claude-3.5-sonnet", "name": "Claude 3.5 Sonnet (Anthropic)", "default": true },
         { "id": "anthropic/claude-3-opus", "name": "Claude 3 Opus (Anthropic)", "default": true },
