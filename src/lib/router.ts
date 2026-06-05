@@ -71,7 +71,7 @@ export async function classifyIntent(
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), parseInt(process.env.ROUTER_TIMEOUT_MS || '5000', 10));
 
     const messages = [
       { role: 'system', content: ROUTER_SYSTEM_PROMPT },

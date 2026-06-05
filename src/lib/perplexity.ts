@@ -97,7 +97,7 @@ export async function queryPerplexityForSnippets(
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), parseInt(process.env.PERPLEXITY_TIMEOUT_MS || '10000', 10));
 
     const messages = [
       {
@@ -192,7 +192,7 @@ export async function queryPerplexity(userQuery: string, conversationHistory: Ar
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), parseInt(process.env.PERPLEXITY_TIMEOUT_MS || '10000', 10));
 
     const messages = [
       {

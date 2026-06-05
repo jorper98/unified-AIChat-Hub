@@ -118,6 +118,17 @@ export default function UnifiedChatInterface() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [settingsData, setSettingsData] = useState<any>(null);
   const [bypassRouter, setBypassRouter] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  // Pagination state
+  const [threadsLimit, setThreadsLimit] = useState(25);
+  const [threadsSkip, setThreadsSkip] = useState(0);
+  const [hasMoreThreads, setHasMoreThreads] = useState(true);
+  const [messagesLimit, setMessagesLimit] = useState(100);
+  const [messagesSkip, setMessagesSkip] = useState(0);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [archivedThreadsSkip, setArchivedThreadsSkip] = useState(0);
+  const [hasMoreArchivedThreads, setHasMoreArchivedThreads] = useState(true);
 
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
@@ -202,19 +213,36 @@ export default function UnifiedChatInterface() {
   }, [showSettingsModal]);
 
   // 2. Fetch/Search Threads for the Sidebar
-  const refreshThreads = (search = '') => {
-    const url = search ? `/api/threads?q=${encodeURIComponent(search)}` : '/api/threads';
+  const refreshThreads = (search = '', skip = 0, isLoadMore = false) => {
+    const url = search 
+      ? `/api/threads?q=${encodeURIComponent(search)}&limit=${threadsLimit}&skip=${skip}` 
+      : `/api/threads?limit=${threadsLimit}&skip=${skip}`;
+    
     fetch(url)
       .then(res => res.json())
       .then(data => {
-        if (data.threads) setThreadsList(data.threads);
+        if (data.threads) {
+          if (isLoadMore) {
+            setThreadsList(prev => [...prev, ...data.threads]);
+          } else {
+            setThreadsList(data.threads);
+          }
+          setHasMoreThreads(data.threads.length === threadsLimit);
+        }
       });
+  };
+
+  const loadMoreThreads = () => {
+    const newSkip = threadsSkip + threadsLimit;
+    setThreadsSkip(newSkip);
+    refreshThreads(searchQuery, newSkip, true);
   };
 
   // Trigger search filtering when user types
   useEffect(() => {
+    setThreadsSkip(0); // Reset skip when search query changes
     const delayDebounce = setTimeout(() => {
-      refreshThreads(searchQuery);
+      refreshThreads(searchQuery, 0, false);
     }, 300); // 300ms debounce to prevent spamming database on every keystroke
     return () => clearTimeout(delayDebounce);
   }, [searchQuery]);
@@ -229,10 +257,14 @@ export default function UnifiedChatInterface() {
   }, [threadId]);
 
   // 3. Load a selected past thread context into view
-  const loadThread = (id: string) => {
-    setLoading(true);
-    setThreadId(id);
-    fetch(`/api/threads/${id}/messages`)
+  const loadThread = (id: string, skip = 0, isLoadMore = false) => {
+    if (!isLoadMore) {
+      setLoading(true);
+      setThreadId(id);
+      setMessagesSkip(0); // Reset message skip when loading a new thread
+    }
+    
+    fetch(`/api/threads/${id}/messages?limit=${messagesLimit}&skip=${skip}`)
       .then(res => res.json())
       .then(data => {
         if (data.messages) {
@@ -246,13 +278,18 @@ export default function UnifiedChatInterface() {
             perplexityUsed: m.perplexityUsed,
             routingTool: m.routingTool
           }));
-          setMessages(mappedMessages);
           
-          // Restore the last used prompt name from messages
-          const lastMessageWithPrompt = mappedMessages.findLast((m: ChatTurn) => m.promptName);
-          if (lastMessageWithPrompt && lastMessageWithPrompt.promptName) {
-            setSelectedPromptName(lastMessageWithPrompt.promptName);
+          if (isLoadMore) {
+            setMessages(prev => [...mappedMessages, ...prev]);
+          } else {
+            setMessages(mappedMessages);
+            // Restore the last used prompt name from messages
+            const lastMessageWithPrompt = mappedMessages.findLast((m: ChatTurn) => m.promptName);
+            if (lastMessageWithPrompt && lastMessageWithPrompt.promptName) {
+              setSelectedPromptName(lastMessageWithPrompt.promptName);
+            }
           }
+          setHasMoreMessages(mappedMessages.length === messagesLimit);
         }
         if (data.thread) {
           setThreadMetadata(data.thread);
@@ -263,6 +300,13 @@ export default function UnifiedChatInterface() {
         }
       })
       .finally(() => setLoading(false));
+  };
+
+  const loadOlderMessages = () => {
+    if (!threadId) return;
+    const newSkip = messagesSkip + messagesLimit;
+    setMessagesSkip(newSkip);
+    loadThread(threadId, newSkip, true);
   };
 
   const startNewChat = () => {
@@ -312,6 +356,7 @@ export default function UnifiedChatInterface() {
       }
     } catch (e) {
       console.error('Failed to rename thread:', e);
+      setErrorMessage('Failed to rename thread.');
     }
   };
 
@@ -343,6 +388,7 @@ export default function UnifiedChatInterface() {
       }
     } catch (e) {
       console.error('Failed to update prompt:', e);
+      setErrorMessage('Failed to update prompt.');
     }
   };
 
@@ -358,6 +404,7 @@ export default function UnifiedChatInterface() {
       }
     } catch (e) {
       console.error('Failed to delete prompt:', e);
+      setErrorMessage('Failed to delete prompt.');
     }
   };
 
@@ -381,6 +428,7 @@ export default function UnifiedChatInterface() {
       }
     } catch (e) {
       console.error('Failed to archive thread:', e);
+      setErrorMessage('Failed to archive thread.');
     }
   };
 
@@ -397,29 +445,45 @@ export default function UnifiedChatInterface() {
       }
     } catch (e) {
       console.error('Failed to delete thread:', e);
+      setErrorMessage('Failed to delete thread.');
     }
   };
 
   const unarchiveThread = async (id: string) => {
     try {
-      const res = await fetch(`/api/threads/${id}/archive`, { method: 'PATCH', body: JSON.stringify({ archived: false }) });
+      const res = await fetch(`/api/threads/${id}/archive`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ archived: false }) });
       if (res.ok) {
         setArchivedThreads(prev => prev.filter(t => t._id !== id));
         refreshThreads();
       }
     } catch (e) {
       console.error('Failed to unarchive thread:', e);
+      setErrorMessage('Failed to unarchive thread.');
     }
   };
 
-  const loadArchivedThreads = async () => {
+  const loadArchivedThreads = async (skip = 0, isLoadMore = false) => {
     try {
-      const res = await fetch('/api/threads?archived=true');
+      const res = await fetch(`/api/threads?archived=true&limit=${threadsLimit}&skip=${skip}`);
       const data = await res.json();
-      if (data.threads) setArchivedThreads(data.threads);
+      if (data.threads) {
+        if (isLoadMore) {
+          setArchivedThreads(prev => [...prev, ...data.threads]);
+        } else {
+          setArchivedThreads(data.threads);
+        }
+        setHasMoreArchivedThreads(data.threads.length === threadsLimit);
+      }
     } catch (e) {
       console.error('Failed to load archived threads:', e);
+      setErrorMessage('Failed to load archived threads.');
     }
+  };
+
+  const loadMoreArchivedThreads = () => {
+    const newSkip = archivedThreadsSkip + threadsLimit;
+    setArchivedThreadsSkip(newSkip);
+    loadArchivedThreads(newSkip, true);
   };
 
   const loadPrompt = (id: string) => {
@@ -448,6 +512,7 @@ export default function UnifiedChatInterface() {
       }
     } catch (e) {
       console.error('Failed to save prompt:', e);
+      setErrorMessage('Failed to save prompt.');
     }
   };
 
@@ -456,6 +521,13 @@ export default function UnifiedChatInterface() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
+
+  useEffect(() => {
+    if (errorMessage) {
+      const timer = setTimeout(() => setErrorMessage(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [errorMessage]);
 
   const threadTokens = messages.reduce((sum, msg) => sum + estimateTokens(msg.content), 0);
   const systemTokens = estimateTokens(systemPrompt);
@@ -489,7 +561,37 @@ export default function UnifiedChatInterface() {
       });
 
       const data = await res.json();
-      if (data.threadId) setThreadId(data.threadId);
+      if (data.threadId) {
+        setThreadId(data.threadId);
+        
+        setThreadsList(prev => {
+          const existingIndex = prev.findIndex(t => t._id === data.threadId);
+          if (existingIndex >= 0) {
+            const updatedThread = { ...prev[existingIndex], updatedAt: new Date().toISOString() };
+            const newList = [...prev];
+            newList.splice(existingIndex, 1);
+            return [updatedThread, ...newList];
+          } else {
+            const trimmed = userText.trim();
+            const firstLine = trimmed.split('\n')[0];
+            const words = firstLine.split(/\s+/);
+            let name = firstLine;
+            if (words.length > 8) {
+              let summary = firstLine.substring(0, 60).trim();
+              const lastSpace = summary.lastIndexOf(' ');
+              if (lastSpace > 20) summary = summary.substring(0, lastSpace);
+              name = summary + '...';
+            }
+            const newThread: ThreadSummary = {
+              _id: data.threadId,
+              name: name,
+              currentModel: model,
+              updatedAt: new Date().toISOString()
+            };
+            return [newThread, ...prev];
+          }
+        });
+      }
       
       setMessages([...ongoingHistory, { 
         role: 'assistant', 
@@ -501,10 +603,9 @@ export default function UnifiedChatInterface() {
         usage: data.usage
       }]);
 
-      refreshThreads(searchQuery); // Update sidebar metadata position natively
-
     } catch (e) {
       console.error(e);
+      setErrorMessage('Failed to send message.');
     } finally {
       setLoading(false);
     }
@@ -681,12 +782,57 @@ export default function UnifiedChatInterface() {
               )}
             </div>
           ))}
+          
+          {/* Pagination Controls for Threads */}
+          <div className="pt-2 flex flex-col gap-2 border-t border-gray-800/50">
+            <div className="flex items-center justify-between">
+              <span className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Show per page:</span>
+              <select 
+                value={threadsLimit} 
+                onChange={(e) => {
+                  const newLimit = parseInt(e.target.value, 10);
+                  setThreadsLimit(newLimit);
+                  setThreadsSkip(0);
+                  refreshThreads(searchQuery, 0, false);
+                }}
+                className={`text-[10px] border rounded px-1 py-0.5 focus:outline-none ${isDark ? 'bg-gray-900 border-gray-700 text-gray-300' : 'bg-white border-gray-300 text-gray-700'}`}
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+            {hasMoreThreads && (
+              <button
+                onClick={loadMoreThreads}
+                className={`w-full text-xs font-semibold py-1.5 rounded border transition ${isDark ? 'bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-300'}`}
+              >
+                Load More Threads
+              </button>
+            )}
+          </div>
         </div>
       </section>
 
       {/* Primary Conversation Stream Panel */}
       <section className={`flex-1 flex flex-col h-full pb-8 ${isDark ? '' : ''}`}>
+        {errorMessage && (
+          <div className={`mx-8 mt-4 p-3 rounded border flex justify-between items-center ${isDark ? 'bg-red-900/30 border-red-700 text-red-200' : 'bg-red-50 border-red-200 text-red-700'}`}>
+            <span className="text-sm">{errorMessage}</span>
+            <button onClick={() => setErrorMessage(null)} className="text-xs font-bold px-2 py-1 hover:opacity-75">✕</button>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto p-8 space-y-6">
+          {hasMoreMessages && messages.length > 0 && (
+            <div className="flex justify-center mb-4">
+              <button
+                onClick={loadOlderMessages}
+                className={`text-xs font-semibold py-2 px-4 rounded border transition ${isDark ? 'bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-300'}`}
+              >
+                Load Older Messages
+              </button>
+            </div>
+          )}
           {messages.length === 0 ? (
             <div className={`h-full flex items-center justify-center text-sm ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
               Initialize a prompt stream or choose an active thread sidebar historical record.
@@ -984,6 +1130,20 @@ export default function UnifiedChatInterface() {
                     </div>
                   </div>
                 ))
+              )}
+              
+              {/* Pagination Controls for Archived Threads */}
+              {archivedThreads.length > 0 && (
+                <div className="pt-2 mt-2 flex flex-col gap-2 border-t border-gray-800/50">
+                  {hasMoreArchivedThreads && (
+                    <button
+                      onClick={loadMoreArchivedThreads}
+                      className={`w-full text-xs font-semibold py-1.5 rounded border transition ${isDark ? 'bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-300'}`}
+                    >
+                      Load More Archived Threads
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
