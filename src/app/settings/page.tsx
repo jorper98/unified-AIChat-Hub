@@ -95,6 +95,8 @@ export default function SettingsPage() {
   const [globalSystemPrompt, setGlobalSystemPrompt] = useState('');
   const [routerModel, setRouterModel] = useState('openai/gpt-4o-mini');
   const [imageGenerationModel, setImageGenerationModel] = useState('google/gemini-3.1-flash-image-preview');
+  const [timezone, setTimezone] = useState('UTC');
+  const [weatherLocation, setWeatherLocation] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -152,6 +154,8 @@ export default function SettingsPage() {
         if (data.globalSystemPrompt !== undefined) setGlobalSystemPrompt(data.globalSystemPrompt || '');
         if (data.routerModel) setRouterModel(data.routerModel);
         if (data.imageGenerationModel) setImageGenerationModel(data.imageGenerationModel);
+        if (data.timezone) setTimezone(data.timezone);
+        if (data.weatherLocation !== undefined) setWeatherLocation(data.weatherLocation || '');
       });
   }, []);
 
@@ -274,7 +278,9 @@ export default function SettingsPage() {
         themeColors: { dark: darkColors, light: lightColors },
         globalSystemPrompt,
         routerModel,
-        imageGenerationModel
+        imageGenerationModel,
+        timezone,
+        weatherLocation
       })
     });
     setSaving(false);
@@ -837,37 +843,77 @@ export default function SettingsPage() {
 
             {activeSection === 'global-prompt' && (
               <>
-                <h1 className="text-2xl font-bold text-indigo-400">Global System Prompt</h1>
+                <h1 className="text-2xl font-bold text-indigo-400">Global System Prompt & Context</h1>
                 <p className="text-sm text-gray-400">
-                  This prompt is injected into EVERY chat session. Date and time are always included. Weather is fetched on-demand when you ask about it.
+                  Configure the automatic context injected into EVERY chat session, along with your global instructions.
                 </p>
 
-                <div className="border border-gray-800 rounded-lg p-4 bg-gray-950">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
-                    Automatically Injected Context
-                  </h3>
-                  <p className="text-xs text-gray-300 font-mono">
-                    Current date and time: {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                  </p>
-                  <p className="text-xs text-gray-300 font-mono mt-1">
-                    Weather: fetched on-demand when you ask &quot;what&apos;s the weather in [location]&quot;
-                  </p>
-                </div>
+                <div className="space-y-6">
+                  <div className="border border-gray-800 rounded-lg p-4 bg-gray-950 space-y-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
+                      Dynamic Context Settings
+                    </h3>
+                    
+                    <div>
+                      <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 block mb-1">
+                        Default Timezone
+                      </label>
+                      <input
+                        type="text"
+                        value={timezone}
+                        onChange={(e) => setTimezone(e.target.value)}
+                        placeholder="e.g., America/Phoenix, UTC, Europe/London"
+                        className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-100 focus:outline-none focus:border-indigo-500"
+                      />
+                      <p className="text-[10px] text-gray-600 mt-1">
+                        IANA timezone format. Used for date and time injection.
+                      </p>
+                    </div>
 
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 block mb-2">
-                    Your Global Instructions
-                  </label>
-                  <textarea
-                    value={globalSystemPrompt}
-                    onChange={(e) => setGlobalSystemPrompt(e.target.value)}
-                    rows={8}
-                    className="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 text-xs text-gray-100 focus:outline-none focus:border-indigo-500 resize-none"
-                    placeholder="e.g., Always respond in markdown format. You are a helpful assistant for Jorge Pereira at 35sites.com LLC..."
-                  />
-                  <p className="text-[10px] text-gray-600 mt-1">
-                    This text is appended after the automatic date/time/weather context. Leave empty to only inject dynamic context.
-                  </p>
+                    <div>
+                      <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 block mb-1">
+                        Default Weather Location
+                      </label>
+                      <input
+                        type="text"
+                        value={weatherLocation}
+                        onChange={(e) => setWeatherLocation(e.target.value)}
+                        placeholder="e.g., Phoenix, AZ or leave empty to disable"
+                        className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-100 focus:outline-none focus:border-indigo-500"
+                      />
+                      <p className="text-[10px] text-gray-600 mt-1">
+                        When you ask "what is the weather", this location will be used automatically.
+                      </p>
+                    </div>
+
+                    <div className="pt-2 border-t border-gray-800">
+                      <h4 className="text-xs font-medium text-gray-400 mb-1">Preview of Injected Context:</h4>
+                      <p className="text-xs text-gray-300 font-mono">
+                        Current date and time: {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: timezone || 'UTC' })} at {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: timezone || 'UTC' })}
+                      </p>
+                      {weatherLocation && (
+                        <p className="text-xs text-gray-300 font-mono mt-1">
+                          Weather: fetched for "{weatherLocation}" on-demand.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 block mb-2">
+                      Your Global Instructions
+                    </label>
+                    <textarea
+                      value={globalSystemPrompt}
+                      onChange={(e) => setGlobalSystemPrompt(e.target.value)}
+                      rows={8}
+                      className="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 text-xs text-gray-100 focus:outline-none focus:border-indigo-500 resize-none"
+                      placeholder="e.g., Always respond in markdown format. You are a helpful assistant for Jorge Pereira at 35sites.com LLC..."
+                    />
+                    <p className="text-[10px] text-gray-600 mt-1">
+                      This text is appended after the automatic date/time/weather context. Leave empty to only inject dynamic context.
+                    </p>
+                  </div>
                 </div>
               </>
             )}

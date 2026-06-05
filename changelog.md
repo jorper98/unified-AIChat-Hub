@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.1
+- Added automated routing test script (`npm run test:routing`) with randomized prompts for weather, stocks, and image generation
+- Test runs now create cleanly named, timestamped threads (e.g., "Test Run: YYYYMMDD-HHMMSS") for easy identification
+- Migrated `TIMEZONE` and `WEATHER_LOCATION` configuration from `.env` to the database-backed Settings UI for dynamic, no-restart updates
+- Fixed router JSON parsing failures for image generation by increasing `max_tokens` and adding robust regex fallbacks for truncated responses
+- Fixed missing time injection in system context prompt (was calculating `timeStr` but not including it in the output)
+
 ## v0.2.0
 - Refactored monolithic 1273-line main page component into 11 focused, modular components for improved maintainability and readability
 - Extracted shared TypeScript interfaces into `src/types.ts` and utility functions into `src/lib/utils.ts`

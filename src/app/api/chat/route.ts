@@ -136,7 +136,7 @@ async function getProviderForModel(modelId: string) {
 
 export async function POST(request: Request) {
   try {
-    const { threadId, messageContent, selectedModel, systemInstruction, promptName, bypassRouter } = await request.json();
+    const { threadId, messageContent, selectedModel, systemInstruction, promptName, bypassRouter, threadName: requestedThreadName } = await request.json();
     console.log(`[Chat] bypassRouter=${bypassRouter}, message="${messageContent.substring(0, 50)}..."`);
     logToServer(`POST /api/chat model=${selectedModel} bypassRouter=${bypassRouter}, message="${messageContent.substring(0, 80)}..."`);
     const db = await getDb();
@@ -155,7 +155,7 @@ export async function POST(request: Request) {
       return summary + '...';
     };
 
-    const threadName = generateThreadName(messageContent);
+    const threadName = requestedThreadName || generateThreadName(messageContent);
     const isNewThread = !threadId;
 
     if (isNewThread) {
