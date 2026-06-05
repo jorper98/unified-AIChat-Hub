@@ -15,7 +15,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { estimateTokens, formatTokenCount, MODEL_CONTEXT_LIMITS, MODEL_PRICING } from '@/lib/tokens';
 import { ChatTurn, ThreadSummary, ThreadMetadata, DropdownModel, SavedPrompt } from '@/types';
 
-const APP_VERSION = '0.2.1';
+const APP_VERSION = '0.2.2';
 
 const MASTER_NAME_MAP: Record<string, string> = {
   'openai/gpt-4o': 'GPT-4o (OpenAI)',
