@@ -32,6 +32,8 @@ interface ThreadSidebarProps {
   APP_VERSION: string;
   toggleTheme: () => void;
   setShowAbout: (show: boolean) => void;
+  setShowGlobalCost: (show: boolean) => void;
+  setShowImageGallery: (show: boolean) => void;
 }
 
 export function ThreadSidebar({
@@ -62,15 +64,17 @@ export function ThreadSidebar({
   APP_VERSION,
   toggleTheme,
   setShowAbout,
+  setShowGlobalCost,
+  setShowImageGallery,
 }: ThreadSidebarProps) {
   return (
     <section className={`w-80 p-4 flex flex-col gap-4 border-r h-full pb-8 ${isDark ? 'bg-gray-950 border-gray-800' : 'bg-white border-gray-200'}`}>
-      <div className="flex justify-between items-start gap-2">
-        <div>
+      <div className="flex flex-col gap-1 mb-2">
+        <div className="flex items-baseline gap-2">
           <h1 className="text-md font-bold text-indigo-400">Unified Chat Hub</h1>
           <span className={`text-[9px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>v{APP_VERSION}</span>
         </div>
-        <div className="flex items-center gap-1 pt-0.5">
+        <div className="flex justify-end items-center gap-1">
           <button onClick={() => setShowAbout(true)} className={`p-1.5 rounded transition ${isDark ? 'text-gray-500 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'}`} title="About">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -86,6 +90,22 @@ export function ThreadSidebar({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
               </svg>
             )}
+          </button>
+          <button 
+            onClick={() => setShowGlobalCost(true)} 
+            className={`p-1.5 rounded transition text-sm font-bold ${isDark ? 'text-gray-500 hover:text-yellow-400 hover:bg-gray-800' : 'text-gray-400 hover:text-yellow-600 hover:bg-gray-200'}`} 
+            title="Global Cost Breakdown"
+          >
+            $
+          </button>
+          <button 
+            onClick={() => setShowImageGallery(true)} 
+            className={`p-1.5 rounded transition ${isDark ? 'text-gray-500 hover:text-indigo-400 hover:bg-gray-800' : 'text-gray-400 hover:text-indigo-600 hover:bg-gray-200'}`} 
+            title="Image Gallery"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
           </button>
           <Link href="/settings" className={`p-1.5 rounded transition ${isDark ? 'text-gray-500 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'}`} title="Settings">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
