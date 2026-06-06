@@ -26,7 +26,7 @@ export function ReadmeModal({
           <h3 className={`text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>README</h3>
           <button onClick={onClose} className={`text-xs px-2 py-1 rounded ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}>✕</button>
         </div>
-        <div className={`p-4 overflow-y-auto flex-1 text-xs ${isDark ? 'text-gray-300' : 'text-gray-700'} prose prose-sm max-w-none ${isDark ? 'prose-invert' : ''} prose-headings:text-sm prose-p:text-xs prose-ul:text-xs prose-strong:text-white`}>
+        <div className={`p-4 overflow-y-auto flex-1 text-xs ${isDark ? 'text-gray-300' : 'text-gray-700'} prose prose-sm max-w-none ${isDark ? 'prose-invert prose-strong:text-white' : 'prose-strong:text-gray-900'} prose-headings:text-sm prose-p:text-xs prose-ul:text-xs`}>
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{readmeContent || 'Loading...'}</ReactMarkdown>
         </div>
       </div>

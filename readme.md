@@ -36,6 +36,79 @@ Unified Chat Hub is a self-hosted, private AI development workspace and model pl
 
 ---
 
+## Directory Blueprint
+
+```text
+unified-chat/
+├── .env                              # Local API tokens & connection strings (excluded from deployment packages)
+├── Dockerfile                        # Single-stage Node compiler engine
+├── docker-compose.yml                # Multi-container service definitions (development)
+├── docker-compose.prod.yml           # Production-ready deployment configuration
+├── package.json                      # Runtime dependencies
+├── next.config.js                    # Next.js build configuration
+├── postcss.config.js                 # Tailwind compilation driver
+├── tailwind.config.js                # Style layer specifications
+├── tsconfig.json                     # TypeScript configuration
+├── readme.md                         # Project documentation
+├── todo.md                           # Development task tracking
+├── scripts/
+│   ├── package-for-deploy.ps1        # Secure deployment packaging script
+│   └── test-routing.ts               # CLI automated routing test script
+└── src/
+    ├── types.ts                      # Shared TypeScript interfaces
+    ├── config/
+    │   └── models.json               # Default model catalog & provider config
+    ├── lib/
+    │   ├── context.ts                # Dynamic context builder (date/time/weather)
+    │   ├── db.ts                     # MongoDB connection pool manager
+    │   ├── image-processing.ts       # Secure base64 extraction and file saving
+    │   ├── logger.ts                 # Server-side logging utility
+    │   ├── model-providers.ts        # Provider configuration resolution
+    │   ├── perplexity.ts             # Perplexity fallback/recheck utility
+    │   ├── response-parser.ts        # Robust multimodal response handling
+    │   ├── router.ts                 # Intent classification router
+    │   ├── thread.ts                 # Thread CRUD and naming operations
+    │   ├── tokens.ts                 # Token estimation & formatting utilities
+    │   ├── types.ts                  # Database document interfaces
+    │   └── utils.ts                  # Shared utility functions (e.g., formatDate)
+    └── app/
+        ├── globals.css               # Tailwind CSS bindings
+        ├── layout.tsx                # Global HTML layout shell
+        ├── page.tsx                  # Main chat workspace interface (orchestrator)
+        ├── logs/page.tsx             # Server logs viewer
+        ├── settings/page.tsx         # Configuration dashboard (includes Automated Testing)
+        ├── components/
+        │   ├── AboutModal.tsx        # About information modal
+        │   ├── ArchiveModal.tsx      # Archived threads modal
+        │   ├── ChatInput.tsx         # Message input and model selection
+        │   ├── CostCalculator.tsx    # Thread cost breakdown modal
+        │   ├── DeleteConfirmModal.tsx# Thread deletion confirmation
+        │   ├── MarkdownRenderer.tsx  # Markdown rendering with code highlighting
+        │   ├── MessageArea.tsx       # Chat message rendering
+        │   ├── PromptModal.tsx       # Saved prompts management modal
+        │   ├── RawDataModal.tsx      # Raw data inspection modal
+        │   ├── ReadmeModal.tsx       # README viewer modal
+        │   ├── SettingsModal.tsx     # Settings viewer modal
+        │   └── ThreadSidebar.tsx     # Thread history and search
+        └── api/
+            ├── chat/route.ts         # Main chat routing endpoint + Perplexity fallback
+            ├── logs/route.ts         # Server logs retrieval
+            ├── prompts/route.ts      # Saved prompts CRUD
+            ├── readme/route.ts       # README file retrieval
+            ├── settings/
+            │   ├── route.ts          # Settings GET/POST
+            │   ├── export/route.ts   # Backup export (ZIP)
+            │   └── import/route.ts   # Backup restore (ZIP)
+            ├── test/routing/route.ts # In-app automated testing API endpoint
+            └── threads/
+                ├── route.ts          # Thread listings & search
+                ├── [id]/route.ts     # Thread update/delete/archive
+                ├── [id]/archive/route.ts # Thread archive toggle
+                └── [id]/messages/route.ts # Historical message loading
+```
+---
+
+
 ### Quick-Start Deployment Instructions
 
 #### 1. Configure Environment Variables
