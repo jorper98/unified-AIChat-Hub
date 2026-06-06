@@ -15,13 +15,16 @@ export async function getDb(): Promise<Db> {
   }
 
   connectionPromise = (async () => {
-    const client = await MongoClient.connect(uri);
-    const db = client.db('chathub');
+    try {
+      const client = await MongoClient.connect(uri);
+      const db = client.db('chathub');
 
-    cachedClient = client;
-    cachedDb = db;
-    connectionPromise = null;
-    return db;
+      cachedClient = client;
+      cachedDb = db;
+      return db;
+    } finally {
+      connectionPromise = null;
+    }
   })();
 
   return connectionPromise;

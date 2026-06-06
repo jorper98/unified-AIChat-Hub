@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.2.8
+- Fixed critical DB connection race condition: wrapped connection promise in `try...finally` to prevent permanent rejection caching on failure
+- Replaced dynamic import with static import for `getDb` in chat route for better performance and standard Next.js practices
+- Added `predev` and `prestart` scripts to log application version on startup, complying with developer guidelines
+- Added `lint` and `typecheck` scripts to enforce code quality standards
+- Enhanced automated testing documentation in `docs.md` to clearly document CLI and in-app testing
+- Bumped version to 0.2.8
+
 ## v0.2.7
 - Fixed Next.js production image caching issue: new API route (`/api/images/[filename]`) serves images dynamically, bypassing static file cache
 - Added rewrite rule in `next.config.js` to redirect `/images/*` requests to the new API route

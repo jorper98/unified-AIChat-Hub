@@ -1,6 +1,6 @@
 # Unified Chat Hub - Complete Documentation
 
-**Version:** 0.2.7  
+**Version:** 0.2.8  
 **Copyright:** (c) 2026 Jorge Pereira (35sites.com LLC)  
 **Website:** https://35sites.com  
 **License:** MIT License
@@ -697,25 +697,27 @@ npm run start
 
 ### Automated Testing
 
+The application includes comprehensive automated testing for the intent router to ensure reliable query classification.
+
 **CLI Test Script:**
+Run the following command to execute automated routing tests from the terminal:
 ```bash
 npm run test:routing
 ```
-
-This runs automated routing tests with randomized prompts for:
+This script runs randomized prompts against the router API to validate routing decisions for:
 - Weather queries
 - Stock price lookups
 - Image generation
 - Direct replies
 - Time/timezone questions
 
-**In-App Testing:**
-1. Open Settings modal
-2. Navigate to "Automated Testing" section
-3. Click "Run Tests"
-4. View results in real-time
+**In-App Testing UI:**
+1. Open the Settings modal from the main chat interface
+2. Navigate to the "Automated Testing" section
+3. Click "Run Tests" to initiate the test suite
+4. View pass/fail results and routing details in real-time
 
-Test runs create timestamped threads (e.g., "Test Run: 20260606-132219") for easy identification.
+*Note: Test runs automatically create timestamped threads (e.g., "Test Run: 20260606-132219") in your database for easy identification and review.*
 
 ### Server Logs
 
