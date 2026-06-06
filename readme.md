@@ -1,6 +1,6 @@
 # Unified Chat Hub
 
-## Version 0.2.5
+## Version 0.2.7
 
 ### About
 Unified Chat Hub is a self-hosted, private AI development workspace and model playground built with Next.js 14, Tailwind CSS, and MongoDB. It provides a unified interface for interacting with multiple AI models through OpenRouter, with an intelligent intent router that classifies queries and routes them to web search or direct LLM response.
@@ -25,6 +25,9 @@ Unified Chat Hub is a self-hosted, private AI development workspace and model pl
 - **Backup & Restore**: With ZIP export/import capabilities.
 - **Docker deployment**: Able to fully deploy via Docker container with the option to place data on a local folder.
 - **In-app automated testing**: One-click UI testing in Settings to verify routing, context injection, and API integrations.
+- **Environment-aware configuration**: Dynamic URL and port handling for seamless local, Docker, and production deployments.
+- **Reliable image serving in production**: API-based image delivery bypasses static file caching for immediate display.
+- **Increased backup capacity**: Backup file size limit raised to 500MB for larger data exports.
 
 ### Technical Stack
 - **Frontend**: Next.js 14.1.4, React 18.2.0, TypeScript 5.4.3
@@ -117,6 +120,13 @@ Create a `.env` file in the project root:
 ```env
 OPENROUTER_API_KEY=sk-or-v1-your_actual_token_string_here
 MONGODB_URI=mongodb://mongo_db:27017/chathub
+
+# Public URL of the application (used for OpenRouter rate-limit attribution and absolute URLs)
+# Update the port if you change the docker-compose port mapping (default is 3031)
+NEXT_PUBLIC_APP_URL=http://localhost:3031
+
+# Host port for running tests from the host machine (matches the left side of docker-compose port mapping)
+HOST_PORT=3031
 
 # Timezone for date/time display (IANA format)
 TIMEZONE=America/Phoenix

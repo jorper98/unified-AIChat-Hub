@@ -92,7 +92,7 @@ export async function POST(request: Request) {
           imageHeaders["Authorization"] = `Bearer ${process.env[imageProvider.apiKeyEnv]}`;
         }
         if (imageProvider.id === 'openrouter') {
-          imageHeaders["HTTP-Referer"] = "http://localhost:3031";
+          imageHeaders["HTTP-Referer"] = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3031";
           imageHeaders["X-Title"] = "Unified Chat Hub";
         }
 
@@ -252,7 +252,7 @@ export async function POST(request: Request) {
           headers["Authorization"] = `Bearer ${process.env[provider.apiKeyEnv]}`;
         }
         if (provider.id === 'openrouter') {
-          headers["HTTP-Referer"] = "http://localhost:3031";
+          headers["HTTP-Referer"] = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3031";
           headers["X-Title"] = "Unified Chat Hub";
         }
 

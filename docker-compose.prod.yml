@@ -7,9 +7,12 @@ services:
       - "3031:3000"  # Access the app at http://<target-computer-ip>:3031
     env_file:
       - .env         # Loads your API keys and configuration
+    volumes:
+      - ./chat_images:/app/public/images  # Saves images to a local folder for easy backups
     depends_on:
       - mongo_db
     restart: unless-stopped
+    command: sh -c "mkdir -p /app/public/images && chmod -R 755 /app/public/images && npm run start"
 
   # 2. MongoDB Database Container
   mongo_db:

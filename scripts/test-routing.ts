@@ -1,4 +1,16 @@
-const API_URL = 'http://localhost:3031/api/chat';
+import * as fs from 'fs';
+
+// Dynamically detect if running inside a Docker container
+const isDocker = fs.existsSync('/.dockerenv') || (process.env.HOSTNAME && /^[a-f0-9]{12}$/.test(process.env.HOSTNAME));
+
+// Inside Docker, Next.js runs on port 3000. On the host, it uses the configured HOST_PORT (default 3031).
+const HOST_PORT = process.env.HOST_PORT || '3031';
+const DEFAULT_API_URL = isDocker 
+  ? 'http://localhost:3000/api/chat' 
+  : `http://localhost:${HOST_PORT}/api/chat`;
+
+// Allow manual override of the entire URL for remote testing
+const API_URL = process.env.API_URL || DEFAULT_API_URL;
 
 interface TestCase {
   name: string;

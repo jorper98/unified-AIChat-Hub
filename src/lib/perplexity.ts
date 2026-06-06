@@ -120,7 +120,7 @@ Keep each snippet to 1-2 sentences. Include actual source URLs for citation.`,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'http://localhost:3031',
+        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3031',
         'X-Title': 'Unified Chat Hub',
       },
       body: JSON.stringify({
@@ -213,7 +213,7 @@ export async function queryPerplexity(userQuery: string, conversationHistory: Ar
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'http://localhost:3031',
+        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3031',
         'X-Title': 'Unified Chat Hub',
       },
       body: JSON.stringify({

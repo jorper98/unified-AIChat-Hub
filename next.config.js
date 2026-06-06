@@ -9,6 +9,15 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // Rewrite image requests to API route to bypass static file caching in production
+  async rewrites() {
+    return [
+      {
+        source: '/images/:path*',
+        destination: '/api/images/:path*',
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;

@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.2.7
+- Fixed Next.js production image caching issue: new API route (`/api/images/[filename]`) serves images dynamically, bypassing static file cache
+- Added rewrite rule in `next.config.js` to redirect `/images/*` requests to the new API route
+- Increased backup file size limit from 50MB to 500MB in import API route
+- Added `chat_images` bind mount volume to `docker-compose.prod.yml` for persistent image storage
+- Added startup `chmod` command in production Docker config to fix image file permissions
+- Bumped version to 0.2.7
+
+## v0.2.6
+- Made test script environment-aware: auto-detects Docker vs Host and supports `HOST_PORT` override for seamless multi-environment testing
+- Made OpenRouter `HTTP-Referer` headers dynamic using `NEXT_PUBLIC_APP_URL` for accurate production rate-limit attribution
+- Removed `ROUTER_TIMEOUT_MS` and `PERPLEXITY_TIMEOUT_MS` from `.env.sample` (now handled by app defaults/settings)
+- Added `NEXT_PUBLIC_APP_URL` and `HOST_PORT` to `.env.sample` for flexible custom port and URL configuration
+- Bumped version to 0.2.6
+
 ## v0.2.5
 - Fixed light mode support for Global Cost Breakdown and Image Gallery modals
 - Moved sidebar icons to second line (right-aligned), version number next to title
