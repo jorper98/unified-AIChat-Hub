@@ -8,12 +8,22 @@ This workspace securely anchors conversational prompt stream history and configu
 
 # Release Information
 
-**Current Sandbox Tracking Release:** `v0.1.9`
+**Current Sandbox Tracking Release:** `v0.2.3`
 ---
 
 ## Key Architecture & Features
 
-### 🖼️ Text-to-Image Generation & Smart Context Optimization
+### 🧪 In-App Automated Testing
+A dedicated "Automated Testing" section in the Settings UI allows you to run end-to-end tests with one click. It verifies routing logic, context injection, and API integrations using randomized prompts, displaying clear pass/fail results and saving the test conversation for review.
+
+### 🏗 Backend Modularization
+The monolithic chat route has been decomposed into focused, maintainable libraries:
+- `thread.ts`: Thread naming and CRUD operations
+- `model-providers.ts`: Provider configuration resolution
+- `image-processing.ts`: Secure base64 extraction and file saving
+- `response-parser.ts`: Robust multimodal response handling
+
+### 🖼️ Robust Image Extraction & Smart Context Optimization
 Full support for text-to-image models (e.g., Gemini 3.1 Flash Image, Flux Pro, SDXL). When an image is generated:
 - The base64 payload is automatically extracted from the API response
 - Images are saved to the `public/images/` folder with unique filenames
@@ -33,18 +43,18 @@ Retains multi-tenant message payloads locally with explicit support for indexing
 ### 🔍 Global Message Search Logs
 Real-time keyword filtering across your database cluster, enabling instant search of historical chats directly from the sidebar.
 
-###  Backup & Restore
+### 🛡️ Robust Backup & Restore
 Full data backup and restore via Settings → Backup & Restore panel. Exports a ZIP file containing:
 
 **Backup Contents:**
-- `data.json` — All database collections (threads, messages, model settings, saved prompts, theme colors, global system prompt)
+- `data.json` — All database collections (threads, messages, model settings, saved prompts, theme colors, global system prompt, timezone, weather location)
 - `images/` — All generated images from `public/images/` folder
 
 **Restore Process:**
 1. Download a backup ZIP file from the Export section
 2. In the Restore section, choose a mode:
    - **Replace All** — Deletes all existing data, then restores everything from the backup
-   - **Merge Only** — Skips items that already exist (by ID), only adds new ones
+   - **Merge Only** — Safely skips items that already exist (by ID), only adds new or missing messages to existing threads
 3. Select the backup ZIP file — data and images are restored automatically
 4. The page reloads to reflect the restored data
 
@@ -89,39 +99,71 @@ An isolated secondary database container automatically performs `mongodump` snap
 
 ```text
 unified-chat/
-├── .env                              # Local API tokens & connection strings
-├── .env.sample                       # Template with all configurable variables
+├── .env                              # Local API tokens & connection strings (excluded from deployment packages)
 ├── Dockerfile                        # Single-stage Node compiler engine
-├── docker-compose.yml                # Multi-container service definitions
+├── docker-compose.yml                # Multi-container service definitions (development)
+├── docker-compose.prod.yml           # Production-ready deployment configuration
 ├── package.json                      # Runtime dependencies
+├── next.config.js                    # Next.js build configuration
 ├── postcss.config.js                 # Tailwind compilation driver
 ├── tailwind.config.js                # Style layer specifications
-├── version.txt                       # Deployment version tag
-├── README.md                         # Project documentation
+├── tsconfig.json                     # TypeScript configuration
+├── readme.md                         # Project documentation
+├── todo.md                           # Development task tracking
+├── scripts/
+│   ├── package-for-deploy.ps1        # Secure deployment packaging script
+│   └── test-routing.ts               # CLI automated routing test script
 └── src/
-    ├── lib/
-    │   ├── db.ts                     # MongoDB connection pool manager
-    │   ├── context.ts                # Dynamic context builder (date/time/weather)
-    │   ├── perplexity.ts             # Perplexity fallback/recheck utility
-    │   └── tokens.ts                 # Token estimation & formatting utilities
+    ├── types.ts                      # Shared TypeScript interfaces
     ├── config/
     │   └── models.json               # Default model catalog & provider config
+    ├── lib/
+    │   ├── context.ts                # Dynamic context builder (date/time/weather)
+    │   ├── db.ts                     # MongoDB connection pool manager
+    │   ├── image-processing.ts       # Secure base64 extraction and file saving
+    │   ├── logger.ts                 # Server-side logging utility
+    │   ├── model-providers.ts        # Provider configuration resolution
+    │   ├── perplexity.ts             # Perplexity fallback/recheck utility
+    │   ├── response-parser.ts        # Robust multimodal response handling
+    │   ├── router.ts                 # Intent classification router
+    │   ├── thread.ts                 # Thread CRUD and naming operations
+    │   ├── tokens.ts                 # Token estimation & formatting utilities
+    │   ├── types.ts                  # Database document interfaces
+    │   └── utils.ts                  # Shared utility functions (e.g., formatDate)
     └── app/
         ├── globals.css               # Tailwind CSS bindings
         ├── layout.tsx                # Global HTML layout shell
-        ├── page.tsx                  # Main chat workspace interface
-        ├── settings/
-        │   └── page.tsx              # Configuration dashboard
+        ├── page.tsx                  # Main chat workspace interface (orchestrator)
+        ├── logs/page.tsx             # Server logs viewer
+        ├── settings/page.tsx         # Configuration dashboard (includes Automated Testing)
         ├── components/
+        │   ├── AboutModal.tsx        # About information modal
+        │   ├── ArchiveModal.tsx      # Archived threads modal
+        │   ├── ChatInput.tsx         # Message input and model selection
         │   ├── CostCalculator.tsx    # Thread cost breakdown modal
+        │   ├── DeleteConfirmModal.tsx# Thread deletion confirmation
         │   ├── MarkdownRenderer.tsx  # Markdown rendering with code highlighting
-        │   └── RawDataModal.tsx      # Raw data inspection modal
+        │   ├── MessageArea.tsx       # Chat message rendering
+        │   ├── PromptModal.tsx       # Saved prompts management modal
+        │   ├── RawDataModal.tsx      # Raw data inspection modal
+        │   ├── ReadmeModal.tsx       # README viewer modal
+        │   ├── SettingsModal.tsx     # Settings viewer modal
+        │   └── ThreadSidebar.tsx     # Thread history and search
         └── api/
-            ├── chat/                 # OpenRouter routing endpoint + Perplexity fallback
-            ├── settings/             # Persist dropdown settings + global system prompt
-            ├── threads/              # Sidebar listings & search
-            └── threads/[id]/messages/
-                                        # Historical message loading
+            ├── chat/route.ts         # Main chat routing endpoint + Perplexity fallback
+            ├── logs/route.ts         # Server logs retrieval
+            ├── prompts/route.ts      # Saved prompts CRUD
+            ├── readme/route.ts       # README file retrieval
+            ├── settings/
+            │   ├── route.ts          # Settings GET/POST
+            │   ├── export/route.ts   # Backup export (ZIP)
+            │   └── import/route.ts   # Backup restore (ZIP)
+            ├── test/routing/route.ts # In-app automated testing API endpoint
+            └── threads/
+                ├── route.ts          # Thread listings & search
+                ├── [id]/route.ts     # Thread update/delete/archive
+                ├── [id]/archive/route.ts # Thread archive toggle
+                └── [id]/messages/route.ts # Historical message loading
 ```
 
 ---

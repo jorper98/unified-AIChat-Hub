@@ -41,6 +41,14 @@ export async function POST(request: Request) {
     const db = await getDb();
     const imagesDir = path.join(process.cwd(), 'public', 'images');
 
+    // Helper to safely convert IDs: only valid 24-char hex strings become ObjectIds
+    const safeObjectId = (id: any) => {
+      if (typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id)) {
+        return new ObjectId(id);
+      }
+      return id;
+    };
+
     const restoreCollection = async (name: string, items: any[]) => {
       if (!items || items.length === 0) return { inserted: 0, skipped: 0 };
 
@@ -51,19 +59,19 @@ export async function POST(request: Request) {
       if (mode === 'replace') {
         await collection.deleteMany({});
         for (const item of items) {
-          const doc = { ...item, _id: new ObjectId(item._id) };
-          if (doc.threadId) doc.threadId = new ObjectId(doc.threadId);
+          const doc = { ...item, _id: safeObjectId(item._id) };
+          if (doc.threadId) doc.threadId = safeObjectId(doc.threadId);
           await collection.insertOne(doc);
           inserted++;
         }
       } else {
         for (const item of items) {
-          const existing = await collection.findOne({ _id: new ObjectId(item._id) });
+          const existing = await collection.findOne({ _id: safeObjectId(item._id) });
           if (existing) {
             skipped++;
           } else {
-            const doc = { ...item, _id: new ObjectId(item._id) };
-            if (doc.threadId) doc.threadId = new ObjectId(doc.threadId);
+            const doc = { ...item, _id: safeObjectId(item._id) };
+            if (doc.threadId) doc.threadId = safeObjectId(doc.threadId);
             await collection.insertOne(doc);
             inserted++;
           }

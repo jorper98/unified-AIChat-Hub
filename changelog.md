@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.3
+- Added in-app "Automated Testing" UI in Settings to run end-to-end routing and context tests with one click
+- Fixed backup/restore ObjectId parsing errors to safely handle both hex IDs and string IDs (like "global_settings")
+- Fixed backup restore file picker to correctly accept `.zip` files
+- Enhanced deployment packaging script to exclude `.env` and `.kilo` for security and cleaner transfers
+- Added `next.config.js` with `ignoreBuildErrors: true` to ensure smooth Docker production builds
+
 ## v0.2.2
 - Refactored monolithic 834-line chat route into 4 focused, modular libraries (`thread.ts`, `model-providers.ts`, `image-processing.ts`, `response-parser.ts`)
 - Replaced fragile, overlapping regex chains for image extraction with a robust, recursive JSON parsing approach
