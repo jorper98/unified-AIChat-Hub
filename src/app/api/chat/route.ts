@@ -8,6 +8,7 @@ import { getProviderForModel } from '@/lib/model-providers';
 import { generateThreadName, createOrUpdateThread, saveUserMessage, getThreadHistory } from '@/lib/thread';
 import { extractAndSaveImages } from '@/lib/image-processing';
 import { parseModelResponse } from '@/lib/response-parser';
+import { getDb } from '@/lib/db';
 
 const MAX_WEB_SEARCH_CONTEXT_CHARS = 15000;
 const MAX_HISTORY_CHARS = 100000;
@@ -20,7 +21,6 @@ export async function POST(request: Request) {
     console.log(`[Chat] bypassRouter=${bypassRouter}, message="${messageContent.substring(0, 50)}..."`);
     logToServer(`POST /api/chat model=${selectedModel} bypassRouter=${bypassRouter}, message="${messageContent.substring(0, 80)}..."`);
 
-    const { getDb } = await import('@/lib/db');
     const db = await getDb();
     const settings = await db.collection<SettingsDocument>('settings').findOne({ _id: 'global_settings' });
 
