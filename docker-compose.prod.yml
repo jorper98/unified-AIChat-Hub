@@ -1,0 +1,28 @@
+services:
+  # 1. Next.js Web App (Production Build)
+  web-app:
+    build: .
+    container_name: unified_chat_web
+    ports:
+      - "3031:3000"  # Access the app at http://<target-computer-ip>:3031
+    env_file:
+      - .env         # Loads your API keys and configuration
+    depends_on:
+      - mongo_db
+    restart: unless-stopped
+
+  # 2. MongoDB Database Container
+  mongo_db:
+    image: mongo:6.0
+    container_name: unified_chat_mongo
+    # Port 27017 is exposed only if you need to connect an external DB tool. 
+    # You can remove the 'ports' section entirely if the DB should be internal only.
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db  # Persistent storage for your chat history
+    restart: unless-stopped
+
+# Named volume ensures your database survives container restarts and updates
+volumes:
+  mongo_data:

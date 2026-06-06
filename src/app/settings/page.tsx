@@ -58,7 +58,7 @@ const DEFAULT_LIGHT: ThemeColors = {
   borderAlt: '#d1d5db'
 };
 
-type SettingsSection = 'models' | 'providers' | 'theme' | 'backup' | 'global-prompt' | 'utility-llms';
+type SettingsSection = 'models' | 'providers' | 'theme' | 'backup' | 'global-prompt' | 'utility-llms' | 'testing';
 
 export default function SettingsPage() {
   const [models, setModels] = useState<Model[]>([]);
@@ -98,6 +98,10 @@ export default function SettingsPage() {
   const [timezone, setTimezone] = useState('UTC');
   const [weatherLocation, setWeatherLocation] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  
+  // Testing state
+  const [runningTests, setRunningTests] = useState(false);
+  const [testResults, setTestResults] = useState<any>(null);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -450,13 +454,33 @@ export default function SettingsPage() {
     }
   };
 
+  const runAutomatedTests = async () => {
+    setRunningTests(true);
+    setTestResults(null);
+    try {
+      const res = await fetch('/api/test/routing', { method: 'POST' });
+      const data = await res.json();
+      setTestResults(data);
+      if (data.summary.failed === 0) {
+        showToast('All automated tests passed!', 'success');
+      } else {
+        showToast(`Tests completed with ${data.summary.failed} failures.`, 'error');
+      }
+    } catch (e: any) {
+      showToast('Failed to run tests: ' + e.message, 'error');
+    } finally {
+      setRunningTests(false);
+    }
+  };
+
   const navItems: { id: SettingsSection; label: string; icon: string }[] = [
     { id: 'models', label: 'Models', icon: '' },
     { id: 'providers', label: 'Providers', icon: '' },
     { id: 'theme', label: 'Theme Colors', icon: '' },
     { id: 'global-prompt', label: 'Global System Prompt', icon: '' },
     { id: 'utility-llms', label: 'Utility LLMs', icon: '' },
-    { id: 'backup', label: 'Backup & Restore', icon: '' }
+    { id: 'backup', label: 'Backup & Restore', icon: '' },
+    { id: 'testing', label: 'Automated Testing', icon: '' }
   ];
 
   const colorRows: { key: keyof ThemeColors; label: string; description: string }[] = [
@@ -1027,7 +1051,7 @@ export default function SettingsPage() {
                       <label className="block">
                         <input
                           type="file"
-                          accept=".json"
+                          accept=".zip"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (file) handleRestore(file);
@@ -1071,6 +1095,85 @@ export default function SettingsPage() {
                   <p className="text-xs text-gray-500">
                     <strong className="text-red-400">Warning:</strong> Replace mode will delete all existing data before restoring. Merge mode only adds items that don't already exist.
                   </p>
+                </div>
+              </>
+            )}
+
+            {activeSection === 'testing' && (
+              <>
+                <h1 className="text-2xl font-bold text-indigo-400">Automated Testing</h1>
+                <p className="text-sm text-gray-400">
+                  Run end-to-end automated tests to verify that the routing logic, context injection, and API integrations are working correctly.
+                </p>
+
+                <div className="border border-gray-800 rounded-lg overflow-hidden bg-gray-950">
+                  <div className="p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-200">Routing & Context Tests</h3>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Tests direct replies, timezone injection, weather lookups, stock searches, and image generation routing.
+                        </p>
+                      </div>
+                      <button
+                        onClick={runAutomatedTests}
+                        disabled={runningTests}
+                        className="px-4 py-2 rounded text-xs font-semibold transition text-white bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-800 disabled:text-gray-600 flex items-center gap-2"
+                      >
+                        {runningTests ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Running...
+                          </>
+                        ) : (
+                          '🧪 Run Tests'
+                        )}
+                      </button>
+                    </div>
+
+                    {testResults && (
+                      <div className="mt-4 border-t border-gray-800 pt-4">
+                        <div className="flex items-center gap-3 mb-3">
+                          <span className={`text-sm font-bold ${testResults.summary.failed === 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {testResults.summary.failed === 0 ? '✅ All Tests Passed' : `❌ ${testResults.summary.failed} Tests Failed`}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            ({testResults.summary.passed} passed, {testResults.summary.failed} failed out of {testResults.summary.total})
+                          </span>
+                        </div>
+                        
+                        <div className="space-y-2 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+                          {testResults.results.map((result: any, idx: number) => (
+                            <div key={idx} className={`p-3 rounded border text-xs ${result.passed ? 'bg-green-900/20 border-green-800' : 'bg-red-900/20 border-red-800'}`}>
+                              <div className="flex justify-between items-start mb-1">
+                                <span className="font-semibold text-gray-200">{result.name}</span>
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${result.passed ? 'bg-green-800 text-green-200' : 'bg-red-800 text-red-200'}`}>
+                                  {result.passed ? 'PASS' : 'FAIL'}
+                                </span>
+                              </div>
+                              <p className="text-gray-400 mb-1">Prompt: "{result.prompt}"</p>
+                              <div className="flex gap-4 text-[10px] font-mono">
+                                <span>Expected: <span className="text-indigo-300">{result.expected}</span></span>
+                                <span>Actual: <span className={result.passed ? 'text-green-300' : 'text-red-300'}>{result.actual}</span></span>
+                              </div>
+                              {result.error && (
+                                <p className="text-red-400 mt-1 text-[10px]">Error: {result.error}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {testResults.threadId && (
+                          <p className="text-[10px] text-gray-500 mt-3 pt-3 border-t border-gray-800">
+                            Test conversation saved to thread ID: <span className="font-mono text-gray-300">{testResults.threadId}</span>
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </>
             )}

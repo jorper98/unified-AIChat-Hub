@@ -17,6 +17,7 @@ tsconfig.tsbuildinfo
 .kilo/
 *.wt
 todo.md
+deploy/
 
 
 
