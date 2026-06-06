@@ -5,7 +5,7 @@ import AdmZip from 'adm-zip';
 import fs from 'fs';
 import path from 'path';
 
-const MAX_BACKUP_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_BACKUP_FILE_SIZE = 500 * 1024 * 1024; // 500MB
 
 export async function POST(request: Request) {
   try {

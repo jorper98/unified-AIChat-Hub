@@ -90,7 +90,7 @@ export async function classifyIntent(
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'http://localhost:3031',
+        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3031',
         'X-Title': 'Unified Chat Hub',
       },
       body: JSON.stringify({

@@ -1,6 +1,6 @@
 # Unified Chat Hub
 
-## Version 0.2.5
+## Version 0.2.7
 
 ### About
 Unified Chat Hub is a self-hosted, private AI development workspace and model playground built with Next.js 14, Tailwind CSS, and MongoDB. It provides a unified interface for interacting with multiple AI models through OpenRouter, with an intelligent intent router that classifies queries and routes them to web search or direct LLM response.
@@ -26,6 +26,9 @@ Unified Chat Hub is a self-hosted, private AI development workspace and model pl
 - Backup & Restore with ZIP export/import
 - Able to fully deploy via Docker container with option to place data on local folder
 - In-App Automated Testing: One-click UI testing in Settings to verify routing, context injection, and API integrations
+- Environment-aware configuration: Dynamic URL and port handling for seamless local, Docker, and production deployments
+- Reliable image serving in production: API-based image delivery bypasses static file caching
+- Increased backup capacity: Backup file size limit raised to 500MB
 
 ### Technical Stack
 - Frontend: Next.js 14.1.4, React 18.2.0, TypeScript 5.4.3
