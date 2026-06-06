@@ -12,10 +12,13 @@ import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { AboutModal } from './components/AboutModal';
 import { ReadmeModal } from './components/ReadmeModal';
 import { SettingsModal } from './components/SettingsModal';
+import { GlobalCostModal } from './components/GlobalCostModal';
+import { ImageGalleryModal } from './components/ImageGalleryModal';
 import { estimateTokens, formatTokenCount, MODEL_CONTEXT_LIMITS, MODEL_PRICING } from '@/lib/tokens';
 import { ChatTurn, ThreadSummary, ThreadMetadata, DropdownModel, SavedPrompt } from '@/types';
+import packageJson from '../../package.json';
 
-const APP_VERSION = '0.2.3';
+const APP_VERSION = packageJson.version;
 
 const MASTER_NAME_MAP: Record<string, string> = {
   'openai/gpt-4o': 'GPT-4o (OpenAI)',
@@ -73,6 +76,8 @@ export default function UnifiedChatInterface() {
   const [readmeContent, setReadmeContent] = useState('');
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [settingsData, setSettingsData] = useState<any>(null);
+  const [showGlobalCost, setShowGlobalCost] = useState(false);
+  const [showImageGallery, setShowImageGallery] = useState(false);
   const [bypassRouter, setBypassRouter] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
@@ -570,6 +575,8 @@ export default function UnifiedChatInterface() {
         APP_VERSION={APP_VERSION}
         toggleTheme={toggleTheme}
         setShowAbout={setShowAbout}
+        setShowGlobalCost={setShowGlobalCost}
+        setShowImageGallery={setShowImageGallery}
       />
 
       <div className="flex-1 flex flex-col h-full pb-8">
@@ -678,6 +685,7 @@ export default function UnifiedChatInterface() {
         appVersion={APP_VERSION}
         setShowReadme={setShowReadme}
         setShowSettingsModal={setShowSettingsModal}
+        setShowGlobalCost={setShowGlobalCost}
       />
 
       <ReadmeModal
@@ -694,6 +702,18 @@ export default function UnifiedChatInterface() {
         isDark={isDark}
         threadsList={threadsList}
         archivedThreads={archivedThreads}
+      />
+
+      <GlobalCostModal
+        isOpen={showGlobalCost}
+        onClose={() => setShowGlobalCost(false)}
+        isDark={isDark}
+      />
+
+      <ImageGalleryModal
+        isOpen={showImageGallery}
+        onClose={() => setShowImageGallery(false)}
+        isDark={isDark}
       />
     </main>
   );

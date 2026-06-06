@@ -8,7 +8,7 @@ This workspace securely anchors conversational prompt stream history and configu
 
 # Release Information
 
-**Current Sandbox Tracking Release:** `v0.2.3`
+**Current Sandbox Tracking Release:** `v0.2.5`
 ---
 
 ## Key Architecture & Features
@@ -243,4 +243,8 @@ docker compose up --build
 ```
 
 ---
+
+## License
+
+// Copyright (c) 2026 Jorge Pereira (35sites.com LLC). Licensed under the MIT License.
 

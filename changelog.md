@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.2.5
+- Fixed light mode support for Global Cost Breakdown and Image Gallery modals
+- Moved sidebar icons to second line (right-aligned), version number next to title
+- Made APP_VERSION dynamic by importing from package.json
+- Updated license to MIT across readme.md, About.md, and created license.md
+- Added favicon.ico to fix 404 error
+- Added Roadmap.md for development tracking
+
+## v0.2.4
+- Added Global Cost Breakdown modal to view aggregated token usage and costs across Active, Archived, and All chats
+- Added Image Gallery modal to browse, view, download, and delete generated images in `/public/images`
+- Added dedicated API routes for cost aggregation and image management
+
 ## v0.2.3
 - Added in-app "Automated Testing" UI in Settings to run end-to-end routing and context tests with one click
 - Fixed backup/restore ObjectId parsing errors to safely handle both hex IDs and string IDs (like "global_settings")
