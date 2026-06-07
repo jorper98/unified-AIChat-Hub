@@ -98,6 +98,9 @@ async function runUpdate() {
     console.log('[OTA Update] Running npm install to sync dependencies...');
     execSync('npm install', { cwd: appDir, stdio: 'inherit' });
     
+    console.log('[OTA Update] Building application for production...');
+    execSync('npm run build', { cwd: appDir, stdio: 'inherit' });
+    
     console.log('[OTA Update] Update applied successfully!');
     console.log('[OTA Update] Exiting process to trigger automatic Docker container restart...');
     
