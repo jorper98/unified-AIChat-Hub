@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.7
+- Fixed backup/restore: corrected collection name mismatch to ensure saved system prompts (multiple system instructions) are properly exported and imported.
+- Bumped version to 0.3.7.
+
 ## v0.3.6
 - Improved OTA update reliability: added `npm run build` step to ensure production `.next` folder is correctly compiled after file extraction.
 - Enhanced deployment packaging script to ensure `.next` folder is included in release artifacts.
