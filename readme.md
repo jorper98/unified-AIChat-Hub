@@ -1,9 +1,18 @@
 # Unified Chat Hub
 
-## Version 0.2.8
+## Version 0.3.0
 
 ### About
-Unified Chat Hub is a self-hosted, private AI development workspace and model playground built with Next.js 14, Tailwind CSS, and MongoDB. It provides a unified interface for interacting with multiple AI models through OpenRouter, with an intelligent intent router that classifies queries and routes them to web search or direct LLM response.
+Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a unified interface for interacting with multiple LLM models within the same chat (Thread). You can search across all chats and track the tokens and costs of your interactions. It relies on OpenRouter, featuring an intelligent intent router that classifies queries and routes them to different tools or your directly selected LLM response.
+
+### Why Use This?
+- **Unified Workspace**: Tired of juggling different web and native OS applications? Keep everything in one simple, consolidated interface.
+- **Model Agnostic**: Use different LLMs based on your current task, or seamlessly switch when you hit the usage limits of free versions. Try new models as soon as they come out.
+- **No Vendor Lock-in**: Maintain your freedom to choose. Rely on OpenRouter for broad access or connect your own custom providers.
+- **Local Model Support**: Seamlessly integrate and use your locally hosted models (e.g., via Ollama or LLM Studio) alongside cloud APIs.
+- **Persistent Context & Memory**: Never re-enter your style, preferences, or memory every time you switch tools or models. Your system instructions and thread history stay with you.
+- **Consolidated Search**: Never forget which chatbot or tool you used for specific research. Search across all your chat threads in one place.
+- **Transparent Cost Tracking**: Track token usage and costs per session, per model, and overall, so you always know exactly what you are spending.
 
 ### Features
 - **Multi-model support**: Via OpenRouter integration (GPT-4o, Claude, Gemini, DeepSeek, Qwen, MiniMax, Kimi, or any other available there).
@@ -36,6 +45,11 @@ Unified Chat Hub is a self-hosted, private AI development workspace and model pl
 - **API Integration**: OpenRouter, Perplexity Sonar
 - **Router Model**: OpenAI GPT-4o Mini (structured JSON classification)
 - **Container Support**: Docker
+
+---
+
+### ⚠️ Security Notice
+**This application is designed for private, self-hosted environments.** It does not include built-in user authentication or access controls. It should **not** be exposed directly to the public internet without proper network-level security, such as a reverse proxy (e.g., Nginx, Traefik), a VPN, or a secure tunnel (e.g., Cloudflare Tunnel), along with appropriate firewall rules.
 
 ---
 
@@ -168,7 +182,8 @@ Backups run automatically every 24 hours. Snapshots are exported from the databa
 ### Author
 Jorge Pereira  
 35sites.com LLC  
-Website: https://35sites.com
+Website: [https://35sites.com/applications/unified-aichat-hub/](https://35sites.com/applications/unified-aichat-hub/)  
+Repository: [https://github.com/jorper98/unified-AIChat-Hub](https://github.com/jorper98/unified-AIChat-Hub)
 
 ### License
 Copyright (c) 2026 Jorge Pereira (35sites.com LLC). Licensed under the MIT License.
