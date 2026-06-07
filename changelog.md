@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.3.6
+- Improved OTA update reliability: added `npm run build` step to ensure production `.next` folder is correctly compiled after file extraction.
+- Enhanced deployment packaging script to ensure `.next` folder is included in release artifacts.
+- Added detailed logging to the OTA update UI to display step-by-step progress and troubleshooting information.
+- Bumped version to 0.3.6.
+
+## v0.3.5
+- Added detailed logging to the OTA update UI to display step-by-step progress and troubleshooting information.
+- Bumped version to 0.3.5.
+
 ## v0.3.4
 - Fixed Over-The-Air (OTA) update script: resolved `SyntaxError` by wrapping top-level `await` in an async function.
 - Fixed OTA update script to properly handle HTTP 302 redirects from GitHub release assets using native `fetch`.

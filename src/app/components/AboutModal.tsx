@@ -80,7 +80,8 @@ export function AboutModal({
       const data = await response.json();
       
       if (response.ok) {
-        setUpdateMessage('✅ Update applied successfully! Please restart the container to apply all changes.');
+        const logDetails = data.logs ? `\n\n--- Update Logs ---\n${data.logs}` : '';
+        setUpdateMessage(`✅ Update applied successfully!${logDetails}`);
       } else {
         const errorMsg = data.details ? `${data.error}\n\nDetails: ${data.details}` : (data.error || 'Unknown error');
         setUpdateMessage(`❌ Update failed: ${errorMsg}`);
@@ -117,7 +118,7 @@ export function AboutModal({
         </div>
         <div className={`p-4 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
           {updateMessage && (
-            <div className={`mb-3 p-2 rounded text-[10px] ${updateMessage.includes('✅') ? (isDark ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700') : (isDark ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700')}`}>
+            <div className={`mb-3 p-2 rounded text-[10px] whitespace-pre-wrap ${updateMessage.includes('✅') ? (isDark ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700') : (isDark ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700')}`}>
               {updateMessage}
             </div>
           )}
