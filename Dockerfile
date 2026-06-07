@@ -1,5 +1,8 @@
 FROM node:18-alpine
 
+# Install curl and unzip for OTA update script
+RUN apk add --no-cache curl unzip
+
 WORKDIR /app
 
 # 1. Install dependencies

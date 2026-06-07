@@ -1,5 +1,6 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -22,7 +23,82 @@ export function AboutModal({
   setShowReadme,
   setShowSettingsModal,
 }: AboutModalProps) {
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateMessage, setUpdateMessage] = useState<string | null>(null);
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
+  const [isCheckingVersion, setIsCheckingVersion] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && !latestVersion && !isCheckingVersion) {
+      setIsCheckingVersion(true);
+      fetch('https://api.github.com/repos/jorper98/unified-AIChat-Hub/releases/latest', {
+        headers: { 'User-Agent': 'Unified-Chat-Hub-Updater' }
+      })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data && data.tag_name) {
+            setLatestVersion(data.tag_name.replace(/^v/, ''));
+          }
+        })
+        .catch(() => {
+          // Silently fail, button will just show default state
+        })
+        .finally(() => {
+          setIsCheckingVersion(false);
+        });
+    }
+  }, [isOpen, latestVersion, isCheckingVersion]);
+
   if (!isOpen) return null;
+
+  let isUpdateAvailable = false;
+  if (latestVersion) {
+    const currentParts = appVersion.split('.').map(Number);
+    const latestParts = latestVersion.split('.').map(Number);
+    for (let i = 0; i < Math.max(currentParts.length, latestParts.length); i++) {
+      const curr = currentParts[i] || 0;
+      const lat = latestParts[i] || 0;
+      if (lat > curr) {
+        isUpdateAvailable = true;
+        break;
+      } else if (lat < curr) {
+        break;
+      }
+    }
+  }
+
+  const handleUpdate = async () => {
+    if (!confirm('Are you sure you want to check for and apply updates? This will download and extract new files. You may need to restart the container afterward.')) {
+      return;
+    }
+    
+    setIsUpdating(true);
+    setUpdateMessage('Checking for updates...');
+    
+    try {
+      const response = await fetch('/api/update', { method: 'POST' });
+      const data = await response.json();
+      
+      if (response.ok) {
+        setUpdateMessage('✅ Update applied successfully! Please restart the container to apply all changes.');
+      } else {
+        setUpdateMessage(`❌ Update failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      setUpdateMessage('❌ Update failed: Network error.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const getButtonState = () => {
+    if (isUpdating) return { text: '⏳ Updating...', disabled: true, className: 'opacity-50 cursor-not-allowed' };
+    if (isCheckingVersion) return { text: '⏳ Checking...', disabled: true, className: 'opacity-50 cursor-not-allowed' };
+    if (isUpdateAvailable) return { text: '🔄 Update Available', disabled: false, className: isDark ? 'border-indigo-600 text-indigo-400 hover:bg-indigo-900/30' : 'border-indigo-300 text-indigo-600 hover:bg-indigo-50' };
+    return { text: '✅ Latest Release', disabled: true, className: 'opacity-50 cursor-not-allowed border-gray-600 text-gray-400' };
+  };
+
+  const buttonState = getButtonState();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
@@ -39,11 +115,24 @@ export function AboutModal({
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{aboutContent || 'Loading...'}</ReactMarkdown>
         </div>
         <div className={`p-4 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+          {updateMessage && (
+            <div className={`mb-3 p-2 rounded text-[10px] ${updateMessage.includes('✅') ? (isDark ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700') : (isDark ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700')}`}>
+              {updateMessage}
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <p className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
               By Jorge Pereira (35sites.com LLC) · <a href="https://35sites.com" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300">35sites.com</a>
             </p>
             <div className="flex gap-2">
+              <button
+                onClick={handleUpdate}
+                disabled={buttonState.disabled}
+                className={`text-[10px] px-2 py-1 rounded border transition flex items-center gap-1 ${buttonState.className}`}
+                title={buttonState.disabled ? 'You are on the latest version' : 'Check and Apply Updates'}
+              >
+                {buttonState.text}
+              </button>
               <button
                 onClick={() => { setShowSettingsModal(true); onClose(); }}
                 className={`text-[10px] px-2 py-1 rounded border transition ${isDark ? 'border-gray-600 text-gray-400 hover:text-white' : 'border-gray-300 text-gray-500 hover:text-gray-800'}`}

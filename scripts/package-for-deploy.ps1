@@ -1,6 +1,14 @@
 # package-for-deploy.ps1
 # This script creates a deployment-ready ZIP archive of the project,
 # excluding unnecessary folders like .git, node_modules, and .next.
+#
+# Usage:
+#   .\scripts\package-for-deploy.ps1             # Creates the zip file only
+#   .\scripts\package-for-deploy.ps1 -Release    # Creates zip AND publishes to GitHub Releases
+
+param (
+    [switch]$Release
+)
 
 $SourcePath = Get-Location
 
@@ -58,6 +66,45 @@ try {
     Write-Host "3. Ensure the .env file contains your OPENROUTER_API_KEY."
     Write-Host "4. Run: docker-compose -f docker-compose.prod.yml up -d --build"
     Write-Host "==================================================" -ForegroundColor Green
+
+    # --- AUTOMATED GITHUB RELEASE ---
+    if ($Release) {
+        Write-Host ""
+        Write-Host "  Initiating GitHub Release Process..." -ForegroundColor Cyan
+        Write-Host "--------------------------------------------------" -ForegroundColor Gray
+        
+        # Check if GitHub CLI is installed
+        if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+            Write-Host "ERROR: GitHub CLI ('gh') is not installed or not in PATH." -ForegroundColor Red
+            Write-Host "Please install it from https://cli.github.com/ and ensure you are logged in ('gh auth login')." -ForegroundColor Yellow
+        } else {
+            try {
+                $RepoInfo = gh repo view --json name,owner -q '.owner.login + "/" + .name'
+                $ReleaseTag = "v$Version"
+                $ReleaseTitle = "Release v$Version"
+                $ReleaseNotes = "Deployment package for Unified Chat Hub v$Version"
+                
+                Write-Host "Creating release '$ReleaseTag' in repository '$RepoInfo'..." -ForegroundColor Gray
+                
+                # Create the release (will fail gracefully if it already exists, or we can add --latest)
+                gh release create $ReleaseTag --title $ReleaseTitle --notes $ReleaseNotes --latest
+                
+                Write-Host "Uploading archive to release..." -ForegroundColor Gray
+                gh release upload $ReleaseTag $DestinationPath --clobber
+                
+                Write-Host "==================================================" -ForegroundColor Green
+                Write-Host "  RELEASE PUBLISHED SUCCESSFULLY!" -ForegroundColor Green
+                Write-Host "==================================================" -ForegroundColor Green
+                Write-Host "Download URL for .env configuration:" -ForegroundColor White
+                Write-Host "  https://github.com/$RepoInfo/releases/download/$ReleaseTag/$(Split-Path $DestinationPath -Leaf)" -ForegroundColor Cyan
+                Write-Host "==================================================" -ForegroundColor Green
+            }
+            catch {
+                Write-Host "ERROR during GitHub release: $_" -ForegroundColor Red
+                Write-Host "Ensure you are authenticated ('gh auth login') and have push access to the repository." -ForegroundColor Yellow
+            }
+        }
+    }
 }
 catch {
     Write-Host "ERROR creating archive: $_" -ForegroundColor Red
