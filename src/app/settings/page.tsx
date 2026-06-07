@@ -23,6 +23,8 @@ interface ThemeColors {
   background: string;
   surface: string;
   surfaceAlt: string;
+  bgSecondary: string;
+  bgTertiary: string;
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
@@ -36,6 +38,8 @@ const DEFAULT_DARK: ThemeColors = {
   background: '#111827',
   surface: '#1f2937',
   surfaceAlt: '#030712',
+  bgSecondary: '#374151',
+  bgTertiary: '#4b5563',
   textPrimary: '#f3f4f6',
   textSecondary: '#d1d5db',
   textMuted: '#6b7280',
@@ -49,6 +53,8 @@ const DEFAULT_LIGHT: ThemeColors = {
   background: '#f9fafb',
   surface: '#ffffff',
   surfaceAlt: '#f3f4f6',
+  bgSecondary: '#d1d5db',
+  bgTertiary: '#9ca3af',
   textPrimary: '#111827',
   textSecondary: '#374151',
   textMuted: '#9ca3af',
@@ -126,6 +132,8 @@ export default function SettingsPage() {
     root.style.setProperty('--bg-background', colors.background);
     root.style.setProperty('--bg-surface', colors.surface);
     root.style.setProperty('--bg-surface-alt', colors.surfaceAlt);
+    root.style.setProperty('--bg-secondary', colors.bgSecondary);
+    root.style.setProperty('--bg-tertiary', colors.bgTertiary);
     root.style.setProperty('--text-primary', colors.textPrimary);
     root.style.setProperty('--text-secondary', colors.textSecondary);
     root.style.setProperty('--text-muted', colors.textMuted);
@@ -152,8 +160,8 @@ export default function SettingsPage() {
         else setProviders(modelConfig.providers.map((p: any) => ({ id: p.id, name: p.name, type: p.type, endpoint: p.endpoint })));
         if (data.theme) setTheme(data.theme);
         if (data.themeColors) {
-          if (data.themeColors.dark) setDarkColors(data.themeColors.dark);
-          if (data.themeColors.light) setLightColors(data.themeColors.light);
+          if (data.themeColors.dark) setDarkColors(prev => ({ ...DEFAULT_DARK, ...data.themeColors.dark }));
+          if (data.themeColors.light) setLightColors(prev => ({ ...DEFAULT_LIGHT, ...data.themeColors.light }));
         }
         if (data.globalSystemPrompt !== undefined) setGlobalSystemPrompt(data.globalSystemPrompt || '');
         if (data.routerModel) setRouterModel(data.routerModel);
@@ -487,6 +495,8 @@ export default function SettingsPage() {
     { key: 'background', label: 'Background', description: 'Main page background' },
     { key: 'surface', label: 'Surface', description: 'Cards, panels, modals' },
     { key: 'surfaceAlt', label: 'Surface Alt', description: 'Sidebar, headers, footers' },
+    { key: 'bgSecondary', label: 'BG Secondary', description: 'Secondary backgrounds (gray-700)' },
+    { key: 'bgTertiary', label: 'BG Tertiary', description: 'Tertiary backgrounds/hover (gray-600)' },
     { key: 'textPrimary', label: 'Text Primary', description: 'Main text, headings' },
     { key: 'textSecondary', label: 'Text Secondary', description: 'Body text, labels' },
     { key: 'textMuted', label: 'Text Muted', description: 'Hints, placeholders, timestamps' },

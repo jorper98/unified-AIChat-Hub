@@ -122,7 +122,7 @@ export function AboutModal({
           )}
           <div className="flex items-center justify-between">
             <p className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-              By Jorge Pereira (35sites.com LLC) · <a href="https://35sites.com" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300">35sites.com</a>
+              By <a href="https://35sites.com/applications/unified-aichat-hub/" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300">Jorge Pereira (35sites.com LLC)</a>
             </p>
             <div className="flex gap-2">
               <button
@@ -135,14 +135,14 @@ export function AboutModal({
               </button>
               <button
                 onClick={() => { setShowSettingsModal(true); onClose(); }}
-                className={`text-[10px] px-2 py-1 rounded border transition ${isDark ? 'border-gray-600 text-gray-400 hover:text-white' : 'border-gray-300 text-gray-500 hover:text-gray-800'}`}
+                className={`text-[10px] px-2 py-1 rounded border transition ${isDark ? 'border-[var(--border-alt)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]' : 'border-[var(--border-alt)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'}`}
                 title="View Settings"
               >
                 ⚙️ Settings
               </button>
               <button
                 onClick={() => { setShowReadme(true); onClose(); }}
-                className={`text-[10px] px-2 py-1 rounded border transition ${isDark ? 'border-gray-600 text-gray-400 hover:text-white' : 'border-gray-300 text-gray-500 hover:text-gray-800'}`}
+                className={`text-[10px] px-2 py-1 rounded border transition ${isDark ? 'border-[var(--border-alt)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]' : 'border-[var(--border-alt)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'}`}
                 title="View README"
               >
                 📄 README

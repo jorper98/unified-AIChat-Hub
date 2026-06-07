@@ -63,7 +63,7 @@ export function PromptModal({
                   placeholder="System instructions..."
                 />
                 <div className="flex gap-1 justify-end">
-                  <button onClick={cancelEditPrompt} className={`text-[10px] px-2 py-1 rounded ${isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>Cancel</button>
+                  <button onClick={cancelEditPrompt} className={`text-[10px] px-2 py-1 rounded ${isDark ? 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]' : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'}`}>Cancel</button>
                   <button onClick={saveEditedPrompt} className="text-[10px] px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-500">Save</button>
                 </div>
               </div>

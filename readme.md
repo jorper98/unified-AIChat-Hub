@@ -1,6 +1,6 @@
 # Unified Chat Hub
 
-## Version 0.3.1
+## Version 0.3.2
 
 ### About
 Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a unified interface for interacting with multiple LLM models within the same chat (Thread). You can search across all chats and track the tokens and costs of your interactions. It relies on OpenRouter, featuring an intelligent intent router that classifies queries and routes them to different tools or your directly selected LLM response.
@@ -38,6 +38,7 @@ Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a un
 - **Reliable image serving in production**: API-based image delivery bypasses static file caching for immediate display.
 - **Increased backup capacity**: Backup file size limit raised to 500MB for larger data exports.
 - **Over-The-Air (OTA) Updates**: Built-in update mechanism to download and apply new versions directly from a GitHub Release zip URL via the About modal, with automatic dependency syncing.
+- **Customizable theme colors**: Fully configurable dark and light mode colors including background, surface, text, accent, border, and secondary/tertiary backgrounds via the Settings UI.
 
 ### Technical Stack
 - **Frontend**: Next.js 14.1.4, React 18.2.0, TypeScript 5.4.3

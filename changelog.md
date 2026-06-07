@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.2
+- Added customizable BG Secondary and BG Tertiary colors to Settings > Theme Colors, allowing users to control assistant message bubble backgrounds and hover states in both dark and light modes.
+- Fixed light mode text visibility: made `prose-invert` conditional in MarkdownRenderer so message text renders correctly in light mode.
+- Fixed CSS variable fallbacks on initial page load so theme colors apply before settings are fetched from the database.
+- Unified assistant message bubble background to use `--bg-secondary` in both dark and light modes for consistent theming.
+- Updated footer link to point directly to the application page (35sites.com/applications/unified-aichat-hub/).
+- Bumped version to 0.3.2.
+
 ## v0.3.1
 - Added Over-The-Air (OTA) update feature: container can now download and apply updates directly from a configured GitHub Release zip URL.
 - Added "Update" button in the About modal to trigger the OTA update process with visual feedback.
