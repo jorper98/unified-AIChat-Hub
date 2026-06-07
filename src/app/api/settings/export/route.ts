@@ -11,7 +11,7 @@ export async function GET() {
     const threads = await db.collection('threads').find({}).toArray();
     const messages = await db.collection('messages').find({}).toArray();
     const settings = await db.collection('settings').find({}).toArray();
-    const prompts = await db.collection('prompts').find({}).toArray();
+    const prompts = await db.collection('system_prompts').find({}).toArray();
 
     const backup = {
       version: '0.1.0',

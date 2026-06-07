@@ -93,8 +93,8 @@ export async function POST(request: Request) {
     if (collections.settings) {
       results.settings = await restoreCollection('settings', collections.settings);
     }
-    if (collections.prompts) {
-      results.prompts = await restoreCollection('prompts', collections.prompts);
+    if (collections.system_prompts) {
+      results.system_prompts = await restoreCollection('system_prompts', collections.system_prompts);
     }
 
     let imagesRestored = 0;
