@@ -1,0 +1,353 @@
+import { NextResponse } from 'next/server';
+import { buildSystemContext } from '@/lib/context';
+import { isUncertainResponse, isPerplexityRecheck, isExitPerplexityMode, queryPerplexity, queryPerplexityForSnippets } from '@/lib/perplexity';
+import { classifyIntent, RouterResult } from '@/lib/router';
+import { logToServer } from '@/lib/logger';
+import { SettingsDocument } from '@/lib/types';
+import { getProviderForModel } from '@/lib/model-providers';
+import { generateThreadName, createOrUpdateThread, saveUserMessage, getThreadHistory } from '@/lib/thread';
+import { extractAndSaveImages } from '@/lib/image-processing';
+import { parseModelResponse } from '@/lib/response-parser';
+import { getDb } from '@/lib/db';
+
+const MAX_WEB_SEARCH_CONTEXT_CHARS = 15000;
+const MAX_HISTORY_CHARS = 100000;
+const TRUNCATED_HISTORY_CHARS = 80000;
+const MIN_HISTORY_MESSAGES = 4;
+
+export async function POST(request: Request) {
+  try {
+    const { threadId, messageContent, selectedModel, systemInstruction, promptName, bypassRouter, threadName: requestedThreadName } = await request.json();
+    console.log(`[Chat] bypassRouter=${bypassRouter}, message="${messageContent.substring(0, 50)}..."`);
+    logToServer(`POST /api/chat model=${selectedModel} bypassRouter=${bypassRouter}, message="${messageContent.substring(0, 80)}..."`);
+
+    const db = await getDb();
+    const settings = await db.collection<SettingsDocument>('settings').findOne({ _id: 'global_settings' });
+
+    const threadName = requestedThreadName || generateThreadName(messageContent);
+    const activeThreadId = await createOrUpdateThread(threadId, threadName, selectedModel, systemInstruction);
+    await saveUserMessage(activeThreadId, messageContent);
+
+    const rawHistory = await getThreadHistory(activeThreadId);
+    const formattedHistory = rawHistory.map(msg => ({
+      role: msg.role as 'user' | 'assistant' | 'system',
+      content: msg.content
+    }));
+
+    const dynamicContextRaw = await buildSystemContext(messageContent);
+    const dynamicContext = bypassRouter ? '' : dynamicContextRaw;
+    const globalPrompt = bypassRouter ? '' : (settings?.globalSystemPrompt || '');
+    
+    if (bypassRouter) {
+      console.log('[Chat] LLM Only mode: All context injection skipped');
+      logToServer('LLM Only mode: All context injection skipped', 'info');
+    }
+
+    let routerResult: RouterResult | null = null;
+    let webSearchContext: string | null = null;
+
+    if (dynamicContext || globalPrompt) {
+      let globalMessage = '';
+      if (dynamicContext) globalMessage += dynamicContext + '\n\n';
+      if (globalPrompt) globalMessage += globalPrompt;
+      formattedHistory.unshift({ role: 'system', content: globalMessage.trim() });
+    }
+
+    if (systemInstruction) {
+      formattedHistory.unshift({ role: 'system', content: systemInstruction });
+    }
+
+    const thread = await db.collection('threads').findOne({ _id: activeThreadId });
+    const inPerplexityMode = thread?.perplexityMode === true;
+    const exitingPerplexityMode = inPerplexityMode && isExitPerplexityMode(messageContent);
+    
+    if (exitingPerplexityMode) {
+      console.log('[Perplexity Mode] Exit trigger detected, disabling Perplexity mode');
+      await db.collection('threads').updateOne({ _id: activeThreadId }, { $set: { perplexityMode: false } });
+    }
+
+    let skipModelCall = false;
+    let perplexityUsage = null;
+    let imageGenUsage = null;
+    let aiTextOutput = "";
+    let usage: any = {};
+
+    const routerModel = settings?.routerModel || 'openai/gpt-4o-mini';
+    const imageGenerationModel = settings?.imageGenerationModel || 'google/gemini-3.1-flash-image-preview';
+
+    if (!inPerplexityMode && !exitingPerplexityMode && !isPerplexityRecheck(messageContent) && !bypassRouter) {
+      const historyForRouter = rawHistory
+        .filter(msg => msg.role === 'user' || msg.role === 'assistant')
+        .map(msg => ({ role: msg.role as 'user' | 'assistant', content: msg.content }));
+
+      routerResult = await classifyIntent(messageContent, historyForRouter, routerModel);
+
+      if (routerResult.route === 'image_generation' && routerResult.imagePrompt) {
+        console.log(`[Router] Image generation triggered: "${routerResult.imagePrompt.substring(0, 80)}..."`);
+        logToServer(`Router image_generation model=${selectedModel}: "${routerResult.imagePrompt.substring(0, 80)}..."`, 'info');
+
+        const imageProvider = await getProviderForModel(imageGenerationModel);
+        const imageHeaders: Record<string, string> = { "Content-Type": "application/json" };
+        if (imageProvider.apiKeyEnv && process.env[imageProvider.apiKeyEnv]) {
+          imageHeaders["Authorization"] = `Bearer ${process.env[imageProvider.apiKeyEnv]}`;
+        }
+        if (imageProvider.id === 'openrouter') {
+          imageHeaders["HTTP-Referer"] = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3031";
+          imageHeaders["X-Title"] = "Unified Chat Hub";
+        }
+
+        try {
+          const imageResponse = await fetch(imageProvider.endpoint, {
+            method: "POST",
+            headers: imageHeaders,
+            body: JSON.stringify({ model: imageGenerationModel, messages: [{ role: 'user', content: routerResult.imagePrompt }] })
+          });
+          const imageCompletionData = await imageResponse.json();
+
+          if (imageCompletionData.choices?.[0]?.message) {
+            const parsed = parseModelResponse(imageCompletionData);
+            aiTextOutput = parsed.text;
+            
+            const imgUsage = imageCompletionData.usage || {};
+            imageGenUsage = {
+              promptTokens: imgUsage.prompt_tokens || imgUsage.promptTokens || 0,
+              completionTokens: imgUsage.completion_tokens || imgUsage.completionTokens || 0,
+              totalTokens: (imgUsage.prompt_tokens || imgUsage.promptTokens || 0) + (imgUsage.completion_tokens || imgUsage.completionTokens || 0),
+              actualCost: imgUsage.cost || 0,
+              model: imageGenerationModel,
+            };
+            skipModelCall = true;
+          }
+        } catch (imageError: any) {
+          console.error('[Image Gen] Failed:', imageError.message);
+          logToServer(`Image Gen failed: ${imageError.message}`, 'error');
+          aiTextOutput = `Image generation failed: ${imageError.message}`;
+          skipModelCall = true;
+        }
+      }
+
+      if (routerResult.route === 'web_search' && routerResult.searchQuery) {
+        console.log(`[Router] Web search triggered: "${routerResult.searchQuery}" (format: ${routerResult.format})`);
+        logToServer(`Router web_search model=${selectedModel}: "${routerResult.searchQuery}" (format: ${routerResult.format})`, 'info');
+
+        if (routerResult.format === 'full_answer') {
+          const perplexityResult = await queryPerplexity(routerResult.searchQuery, historyForRouter);
+          if (perplexityResult) {
+            webSearchContext = `<web_search_context>\n<answer>${perplexityResult.answer}</answer>\n</web_search_context>`;
+            perplexityUsage = {
+              promptTokens: perplexityResult.promptTokens,
+              completionTokens: perplexityResult.completionTokens,
+              totalTokens: perplexityResult.promptTokens + perplexityResult.completionTokens,
+              actualCost: perplexityResult.cost,
+            };
+          }
+        } else if (routerResult.format === 'snippets') {
+          const snippetsResult = await queryPerplexityForSnippets(routerResult.searchQuery);
+          if (snippetsResult) {
+            const snippetLines = snippetsResult.snippets.split('\n').map((line, idx) => {
+              if (line.trim().match(/^\d+\./)) return `<snippet number="${idx + 1}">${line}</snippet>`;
+              return line;
+            });
+            const sourceTags = snippetsResult.citations.map(url => `    <source url="${url}" />`).join('\n');
+            webSearchContext = `<web_search_context>\n${snippetLines.join('\n')}\n<sources>\n${sourceTags}\n</sources>\n</web_search_context>`;
+            perplexityUsage = {
+              promptTokens: snippetsResult.promptTokens,
+              completionTokens: snippetsResult.completionTokens,
+              totalTokens: snippetsResult.promptTokens + snippetsResult.completionTokens,
+              actualCost: snippetsResult.cost,
+            };
+          }
+        }
+      }
+    }
+
+    if (webSearchContext) {
+      console.log(`[WebSearch] Injecting context (${webSearchContext.length} chars)`);
+      const truncatedContext = webSearchContext.length > MAX_WEB_SEARCH_CONTEXT_CHARS
+        ? webSearchContext.substring(0, MAX_WEB_SEARCH_CONTEXT_CHARS) + '\n</web_search_context>'
+        : webSearchContext;
+      formattedHistory.unshift({ role: 'system', content: truncatedContext });
+    }
+
+    if (webSearchContext && routerResult) {
+      formattedHistory.unshift({
+        role: 'system',
+        content: `You have access to web search results wrapped in <web_search_context> tags. Use this information to provide accurate, up-to-date responses. Always cite your sources by referencing the source URLs when using search data (e.g., [Source: URL]).`
+      });
+    }
+
+    const totalChars = formattedHistory.reduce((sum, msg) => sum + msg.content.length, 0);
+    if (totalChars > MAX_HISTORY_CHARS) {
+      console.log(`[Chat] History too large (${totalChars} chars), truncating oldest messages`);
+      while (formattedHistory.length > MIN_HISTORY_MESSAGES && formattedHistory.reduce((sum, msg) => sum + msg.content.length, 0) > TRUNCATED_HISTORY_CHARS) {
+        formattedHistory.shift();
+      }
+    }
+
+    if (inPerplexityMode && !exitingPerplexityMode) {
+      console.log('[Perplexity Mode] Active, sending to Perplexity');
+      logToServer(`Perplexity Mode model=${selectedModel} active`, 'info');
+      const perplexityHistory = rawHistory
+        .filter(msg => msg.role === 'user' || msg.role === 'assistant')
+        .map(msg => ({ role: msg.role, content: msg.content }));
+      const perplexityResult = await queryPerplexity(messageContent, perplexityHistory);
+      if (perplexityResult) {
+        aiTextOutput = perplexityResult.answer;
+        perplexityUsage = {
+          promptTokens: perplexityResult.promptTokens,
+          completionTokens: perplexityResult.completionTokens,
+          totalTokens: perplexityResult.promptTokens + perplexityResult.completionTokens,
+          actualCost: perplexityResult.cost,
+        };
+        skipModelCall = true;
+      }
+    } else if (isPerplexityRecheck(messageContent)) {
+      console.log('[Perplexity Recheck] Recheck request detected, finding previous user message...');
+      logToServer(`Perplexity Recheck model=${selectedModel} triggered`, 'info');
+      const userMessages = rawHistory.filter(msg => msg.role === 'user');
+      const previousUserMessage = userMessages.length > 1 ? userMessages[userMessages.length - 2] : null;
+
+      if (previousUserMessage) {
+        console.log(`[Perplexity Recheck] Running previous question through Perplexity: "${previousUserMessage.content.substring(0, 50)}..."`);
+        const perplexityResult = await queryPerplexity(previousUserMessage.content);
+        if (perplexityResult) {
+          aiTextOutput = perplexityResult.answer;
+          perplexityUsage = {
+            promptTokens: perplexityResult.promptTokens,
+            completionTokens: perplexityResult.completionTokens,
+            totalTokens: perplexityResult.promptTokens + perplexityResult.completionTokens,
+            actualCost: perplexityResult.cost,
+          };
+          skipModelCall = true;
+          await db.collection('threads').updateOne({ _id: activeThreadId }, { $set: { perplexityMode: true } });
+          console.log('[Perplexity Recheck] Perplexity mode enabled for follow-ups');
+        }
+      }
+    }
+
+    let completionData: any;
+
+    if (!skipModelCall) {
+      const provider = await getProviderForModel(selectedModel);
+      
+      if (provider.type === 'local' || provider.id === 'ollama') {
+        const response = await fetch(provider.endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: selectedModel, messages: formattedHistory, stream: false })
+        });
+        completionData = await response.json();
+        if (completionData.error) {
+          return NextResponse.json({ threadId: activeThreadId.toHexString(), response: `Ollama Error: ${completionData.error}` });
+        }
+        aiTextOutput = completionData.message?.content || "No response from model.";
+        usage = {
+          promptTokens: completionData.prompt_eval_count || 0,
+          completionTokens: completionData.eval_count || 0,
+          totalTokens: (completionData.prompt_eval_count || 0) + (completionData.eval_count || 0)
+        };
+      } else {
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (provider.apiKeyEnv && process.env[provider.apiKeyEnv]) {
+          headers["Authorization"] = `Bearer ${process.env[provider.apiKeyEnv]}`;
+        }
+        if (provider.id === 'openrouter') {
+          headers["HTTP-Referer"] = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3031";
+          headers["X-Title"] = "Unified Chat Hub";
+        }
+
+        const response = await fetch(provider.endpoint, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ model: selectedModel, messages: formattedHistory })
+        });
+        completionData = await response.json();
+
+        if (completionData.error) {
+          console.error("--- API ERROR ---");
+          console.error(JSON.stringify(completionData.error, null, 2));
+          return NextResponse.json({
+            threadId: activeThreadId.toHexString(),
+            response: `API Error [${completionData.error.code || 'unknown'}]: ${completionData.error.message || completionData.error}`
+          });
+        }
+
+        const parsed = parseModelResponse(completionData);
+        aiTextOutput = parsed.text;
+        usage = completionData.usage || {};
+        
+        if (!aiTextOutput || aiTextOutput === "API error or empty payload returned.") {
+           const choice = completionData.choices?.[0];
+           const finishReason = choice?.finish_reason || '(none)';
+           console.log('[Empty Response] Model:', selectedModel, 'Finish reason:', finishReason);
+           aiTextOutput = `API error or empty payload returned. (finish_reason: ${finishReason}) Check server console for full response dump.`;
+        }
+      }
+    }
+
+    // Extract and save any base64 images in the response text, replace with markdown image links
+    aiTextOutput = extractAndSaveImages(aiTextOutput);
+
+    if (!bypassRouter && !perplexityUsage && isUncertainResponse(aiTextOutput)) {
+      console.log('[Perplexity Fallback] Uncertainty detected in model response, querying Perplexity...');
+      logToServer(`Perplexity Fallback model=${selectedModel}: uncertainty detected`, 'warn');
+      const perplexityResult = await queryPerplexity(messageContent);
+      if (perplexityResult) {
+        aiTextOutput = perplexityResult.answer;
+        perplexityUsage = {
+          promptTokens: perplexityResult.promptTokens,
+          completionTokens: perplexityResult.completionTokens,
+          totalTokens: perplexityResult.promptTokens + perplexityResult.completionTokens,
+          actualCost: perplexityResult.cost,
+        };
+      }
+    }
+
+    await db.collection('messages').insertOne({
+      threadId: activeThreadId,
+      role: 'assistant',
+      content: aiTextOutput || "",
+      modelUsed: selectedModel,
+      systemInstruction: systemInstruction || "You are a helpful assistant.",
+      promptName: promptName || null,
+      perplexityUsed: perplexityUsage ? true : false,
+      routingTool: routerResult?.route === 'image_generation' ? imageGenerationModel : routerResult?.route === 'web_search' ? 'web_search' : 'direct',
+      usage: {
+        promptTokens: usage.promptTokens || usage.prompt_tokens || 0,
+        completionTokens: usage.completionTokens || usage.completion_tokens || 0,
+        totalTokens: usage.totalTokens || usage.total_tokens || 0,
+        imageTokens: usage.completion_tokens_details?.image_tokens || 0,
+        actualCost: usage.cost || 0,
+        perplexityTokens: perplexityUsage?.totalTokens || 0,
+        perplexityCost: perplexityUsage?.actualCost || 0,
+        imageGenTokens: imageGenUsage?.totalTokens || 0,
+        imageGenCost: imageGenUsage?.actualCost || 0,
+        imageGenModel: imageGenUsage?.model || '',
+        routerTokens: routerResult ? routerResult.promptTokens + routerResult.completionTokens : 0,
+        routerCost: routerResult ? routerResult.cost : 0,
+      },
+      createdAt: new Date()
+    });
+
+    return NextResponse.json({ 
+      threadId: activeThreadId.toHexString(), 
+      response: aiTextOutput,
+      routingTool: routerResult?.route === 'image_generation' ? imageGenerationModel : routerResult?.route === 'web_search' ? 'web_search' : 'direct',
+      perplexityUsed: perplexityUsage ? true : false,
+      usage: {
+        ...usage,
+        perplexityTokens: perplexityUsage?.totalTokens || 0,
+        perplexityCost: perplexityUsage?.actualCost || 0,
+        imageGenTokens: imageGenUsage?.totalTokens || 0,
+        imageGenCost: imageGenUsage?.actualCost || 0,
+        imageGenModel: imageGenUsage?.model || '',
+        routerTokens: routerResult ? routerResult.promptTokens + routerResult.completionTokens : 0,
+        routerCost: routerResult ? routerResult.cost : 0,
+      }
+    });
+
+  } catch (error: any) {
+    console.error("Backend runtime failure:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

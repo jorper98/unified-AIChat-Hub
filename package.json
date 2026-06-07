@@ -1,0 +1,38 @@
+{
+  "name": "unified-chat-hub",
+  "version": "0.3.0",
+  "private": true,
+  "scripts": {
+    "predev": "node -e \"console.log('\\nStarting Unified Chat Hub v' + require('./package.json').version + '\\n')\"",
+    "prestart": "node -e \"console.log('\\nStarting Unified Chat Hub v' + require('./package.json').version + '\\n')\"",
+    "dev": "next dev -p 3031",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test:routing": "tsx scripts/test-routing.ts"
+  },
+  "dependencies": {
+    "@tailwindcss/typography": "^0.5.19",
+    "adm-zip": "^0.5.17",
+    "jszip": "^3.10.1",
+    "mongodb": "^6.5.0",
+    "next": "^14.1.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
+    "@types/node": "^20.11.30",
+    "@types/react": "^18.2.70",
+    "@types/react-dom": "^18.2.22",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.1",
+    "tsx": "^4.22.4",
+    "typescript": "^5.4.3"
+  }
+}

@@ -1,0 +1,1351 @@
+# Unified Chat Hub - Complete Documentation
+
+**Version:** 0.3.0  
+**Copyright:** (c) 2026 Jorge Pereira (35sites.com LLC)  
+**Website:** https://35sites.com  
+**License:** MIT License
+
+---
+
+## Table of Contents
+
+1. [Architecture](#architecture)
+2. [Installation](#installation)
+3. [Configuration](#configuration)
+4. [Usage](#usage)
+5. [API Endpoints](#api-endpoints)
+6. [Troubleshooting](#troubleshooting)
+
+---
+
+## Architecture
+
+### Overview
+
+Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a unified interface for interacting with multiple LLM models within the same chat (Thread). You can search across all chats and track the tokens and costs of your interactions. It relies on OpenRouter, featuring an intelligent intent router that classifies queries and routes them to different tools or your directly selected LLM response.
+
+### Technology Stack
+
+- **Frontend/Backend:** Next.js 14.1.4 with React 18.2.0
+- **Language:** TypeScript 5.4.3
+- **Styling:** Tailwind CSS 3.4.1
+- **Database:** MongoDB 6.5.0
+- **AI Integration:** OpenRouter API (multi-model support)
+- **Web Search:** Perplexity Sonar via OpenRouter
+- **Container Support:** Docker & Docker Compose
+
+### System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Client Browser                         │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Next.js Application                       │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │
+│  │   Frontend   │  │  API Routes  │  │  Static Files    │   │
+│  │   (React)    │  │  (Backend)   │  │  (/public)       │   │
+│  └──────────────┘  └──────────────┘  └──────────────────┘   │
+│         │                  │                                │
+│         ▼                  ▼                                │
+│  ┌──────────────┐  ┌──────────────┐                         │
+│  │   Router     │  │   Database   │                         │
+│  │  (Intent)    │  │   (MongoDB)  │                         │
+│  └──────────────┘  └──────────────┘                         │
+└─────────────────────────────────────────────────────────────┘
+         │                                    │
+         ▼                                    ▼
+┌──────────────────┐              ┌──────────────────────┐
+│  OpenRouter API  │              │   File System        │
+│  (AI Models)     │              │   (/public/images)   │
+└──────────────────┘              └──────────────────────┘
+```
+
+### Key Components
+
+1. **Intent Router** (`src/lib/router.ts`)
+   - Lightweight GPT-4o Mini classifier (configurable via UI settings) 
+   - Routes queries to: `web_search`, `image_generation`, or `direct_reply`
+   - Structured JSON schema with auto-fallback on timeout/error
+
+2. **Chat Handler** (`src/app/api/chat/route.ts`)
+   - Main API endpoint for all chat interactions
+   - Manages thread creation, message history, and context injection
+   - Handles Perplexity fallback for uncertain responses
+
+3. **Image Processing** (`src/lib/image-processing.ts`)
+   - Uses Image Generation LLM (configurable via UI settings) 
+   - Extracts base64 images from AI responses   
+   - Saves to `/public/images/` with secure filenames
+   - Returns markdown image links for rendering
+
+4. **Database Layer** (`src/lib/db.ts`)
+   - MongoDB connection pool manager
+   - Promise-based connection lock to prevent duplicate connections
+   - Collections: `threads`, `messages`, `settings`, `prompts`
+
+5. **Dynamic Context** (`src/lib/context.ts`)
+   - Injects current date/time (timezone-aware)
+   - Weather information via wttr.in API
+   - Configurable via Settings UI
+
+### Directory Structure
+
+```
+unified-chat/
+├── .env                              # Environment variables (API keys, config)
+├── docker-compose.yml                # Development Docker configuration
+├── docker-compose.prod.yml           # Production Docker configuration
+├── Dockerfile                        # Container build instructions
+├── next.config.js                    # Next.js configuration
+├── package.json                      # Dependencies and scripts
+├── tailwind.config.js                # Tailwind CSS configuration
+├── tsconfig.json                     # TypeScript configuration
+├── docs.md                           # This documentation file
+├── readme.md                         # Project overview
+├── changelog.md                      # Version history
+├── license.md                        # MIT License
+├── scripts/
+│   ├── test-routing.ts               # CLI automated routing tests
+│   └── package-for-deploy.ps1        # Deployment packaging script
+── public/
+│   ├── images/                       # Generated image storage
+│   └── About.md                      # In-app about information
+└── src/
+    ├── types.ts                      # Shared TypeScript interfaces
+    ├── config/
+    │   └── models.json               # Default model catalog & providers
+    ├── lib/
+    │   ├── context.ts                # Dynamic context builder
+    │   ├── db.ts                     # MongoDB connection manager
+    │   ├── image-processing.ts       # Image extraction & saving
+    │   ├── logger.ts                 # Server-side logging
+    │   ├── model-providers.ts        # Provider configuration
+    │   ├── perplexity.ts             # Perplexity integration
+    │   ├── response-parser.ts        # Response parsing utilities
+    │   ├── router.ts                 # Intent classification
+    │   ├── thread.ts                 # Thread CRUD operations
+    │   ├── tokens.ts                 # Token estimation
+    │   ├── types.ts                  # Database interfaces
+    │   └── utils.ts                  # Shared utilities
+    └── app/
+        ├── globals.css               # Global styles
+        ├── layout.tsx                # Root layout
+        ├── page.tsx                  # Main chat interface
+        ├── components/               # React components
+        │   ├── AboutModal.tsx
+        │   ├── ArchiveModal.tsx
+        │   ├── ChatInput.tsx
+        │   ├── CostCalculator.tsx
+        │   ├── DeleteConfirmModal.tsx
+        │   ├── MarkdownRenderer.tsx
+        │   ├── MessageArea.tsx
+        │   ├── PromptModal.tsx
+        │   ├── RawDataModal.tsx
+        │   ├── ReadmeModal.tsx
+        │   ├── SettingsModal.tsx
+        │   └── ThreadSidebar.tsx
+        └── api/                      # API routes
+            ├── chat/route.ts
+            ├── costs/route.ts
+            ├── images/
+            │   ├── route.ts
+            │   └── [filename]/route.ts
+            ├── logs/route.ts
+            ├── prompts/route.ts
+            ├── readme/route.ts
+            ├── settings/
+            │   ├── route.ts
+            │   ├── export/route.ts
+            │   └── import/route.ts
+            ├── test/routing/route.ts
+            └── threads/
+                ├── route.ts
+                ── [id]/
+                    ├── route.ts
+                    ├── archive/route.ts
+                    └── messages/route.ts
+```
+
+---
+
+## Installation
+
+Unified Chat Hub supports multiple installation methods depending on your needs. Choose the option that best fits your use case.
+
+### Prerequisites
+
+**For Local Development (Options 1 & 2):**
+- **Node.js:** Version 18 or higher (Application dependencies are installed via `npm install`)
+- **MongoDB:** Version 6.0 or higher (or Docker for containerized MongoDB)
+- **Git:** For cloning the repository
+
+**For Docker Deployment (Option 3):**
+- **Docker & Docker Compose:** (Node.js and application dependencies are automatically pulled and built inside the container)
+- **Git:** For cloning the repository
+
+**Required for All Options:**
+- **OpenRouter API Key:** Get one at https://openrouter.ai
+
+**For Docker Deployment (Option 3):**
+- **Docker & Docker Compose:** (Node.js and application dependencies are automatically pulled and built inside the container)
+- **Git:** For cloning the repository
+
+**Required for All Options:**
+- **OpenRouter API Key:** Get one at https://openrouter.ai
+
+**For Docker Deployment (Option 3):**
+- **Docker & Docker Compose:** (Node.js and application dependencies are automatically pulled and built inside the container)
+- **Git:** For cloning the repository
+
+**Required for All Options:**
+- **OpenRouter API Key:** Get one at https://openrouter.ai
+
+**For Docker Deployment (Option 3):**
+- **Docker & Docker Compose:** (Node.js and application dependencies are automatically pulled and built inside the container)
+- **Git:** For cloning the repository
+
+**Required for All Options:**
+- **OpenRouter API Key:** Get one at https://openrouter.ai
+
+### Option 1: All Files Locally (No Docker)
+
+Use this option for development or if you prefer to run everything natively on your machine.
+
+**Step 1: Clone the Repository**
+```bash
+git clone <repository-url>
+cd unified-chat
+```
+
+**Step 2: Install Dependencies**
+```bash
+npm install
+```
+
+**Reference: `package.json`**
+> *Note: The following is a sample `package.json` as of the writing of this documentation (v0.2.7). Always refer to the latest version in the repository for current dependencies and scripts.*
+
+```json
+{
+  "name": "unified-chat-hub",
+  "version": "0.2.7",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3031",
+    "build": "next build",
+    "start": "next start",
+    "test:routing": "tsx scripts/test-routing.ts"
+  },
+  "dependencies": {
+    "@tailwindcss/typography": "^0.5.19",
+    "adm-zip": "^0.5.17",
+    "jszip": "^3.10.1",
+    "mongodb": "^6.5.0",
+    "next": "^14.1.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
+    "@types/node": "^20.11.30",
+    "@types/react": "^18.2.70",
+    "@types/react-dom": "^18.2.22",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.1",
+    "tsx": "^4.22.4",
+    "typescript": "^5.4.3"
+  }
+}
+```
+
+**Step 3: Configure Environment**
+Create a `.env` file in the project root:
+```env
+OPENROUTER_API_KEY=sk-or-v1-your_actual_token_here
+MONGODB_URI=mongodb://localhost:27017/chathub
+TIMEZONE=America/Phoenix
+WEATHER_LOCATION=Phoenix, AZ
+NEXT_PUBLIC_APP_URL=http://localhost:3031
+HOST_PORT=3031
+```
+
+**Step 4: Start MongoDB**
+Ensure MongoDB is running on your system:
+```bash
+# macOS (with Homebrew)
+brew services start mongodb-community
+
+# Linux (systemd)
+sudo systemctl start mongod
+
+# Windows
+net start MongoDB
+```
+
+**Step 5: Run Development Server**
+```bash
+npm run dev
+```
+
+The application will be available at `http://localhost:3031`.
+
+**Step 6: Production Build (Optional)**
+```bash
+npm run build
+npm run start
+```
+
+---
+
+### Option 2: Only MongoDB in Container
+
+Use this option for local development with Dockerized database but native application runtime. This provides database isolation while allowing hot-reloading and easy debugging.
+
+**Step 1: Clone the Repository**
+```bash
+git clone <repository-url>
+cd unified-chat
+```
+
+**Step 2: Install Dependencies**
+```bash
+npm install
+```
+
+**Step 3: Configure Environment**
+Create a `.env` file:
+```env
+OPENROUTER_API_KEY=sk-or-v1-your_actual_token_here
+MONGODB_URI=mongodb://localhost:27017/chathub
+TIMEZONE=America/Phoenix
+WEATHER_LOCATION=Phoenix, AZ
+NEXT_PUBLIC_APP_URL=http://localhost:3031
+HOST_PORT=3031
+```
+
+**Step 4: Start MongoDB Container**
+```bash
+docker compose up mongo_db -d
+```
+
+This starts only the MongoDB service in detached mode. The `web-app` service is not started.
+
+**Step 5: Run Development Server**
+```bash
+npm run dev
+```
+
+The application runs natively with hot-reloading, while MongoDB runs in a container.
+
+**Step 6: Stop MongoDB Container**
+```bash
+docker compose down
+```
+
+---
+
+### Option 3: Full Container Deployment (Production)
+
+Use this option for production deployments or when you want complete containerization. All application files run inside the container, except generated images which are stored in a host folder for persistence and easy backups.
+
+**Step 1: Clone the Repository**
+```bash
+git clone <repository-url>
+cd unified-chat
+```
+
+**Step 2: Configure Environment**
+Create a `.env` file:
+```env
+OPENROUTER_API_KEY=sk-or-v1-your_actual_token_here
+MONGODB_URI=mongodb://mongo_db:27017/chathub
+TIMEZONE=America/Phoenix
+WEATHER_LOCATION=Phoenix, AZ
+NEXT_PUBLIC_APP_URL=http://your-server-ip:3031
+HOST_PORT=3031
+```
+
+**Important:** In production, `MONGODB_URI` must use `mongo_db` (the Docker service name) instead of `localhost`.
+
+**Step 3: Build and Start Containers**
+```bash
+docker-compose -f docker-compose.prod.yml up -d --build
+```
+
+This command:
+- Builds the Next.js application inside the container
+- Starts MongoDB in a separate container
+- Creates a `chat_images` folder on the host for persistent image storage
+- Maps host port 3031 to container port 3000
+
+**Reference: `Dockerfile`**
+> *Note: The following is a sample `Dockerfile` as of the writing of this documentation. Always refer to the latest version in the repository.*
+
+```dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+# 1. Install dependencies
+COPY package.json ./
+RUN npm install
+
+# 2. Copy the rest of your code
+COPY . .
+
+# 3. Build the Next.js application
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm run build
+
+# 4. Expose and Bind to all incoming network traffic
+EXPOSE 3000
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+CMD ["npm", "run", "start"]
+```
+
+**Step 4: Access the Application**
+Open your browser to:
+- Local: `http://localhost:3031`
+- Remote: `http://your-server-ip:3031`
+
+**Step 5: View Logs**
+```bash
+docker-compose -f docker-compose.prod.yml logs -f
+```
+
+**Step 6: Stop Containers**
+```bash
+docker-compose -f docker-compose.prod.yml down
+```
+
+**Step 7: Rebuild After Changes**
+If you modify `.env`, `package.json`, `docker-compose.prod.yml`, or the directory structure:
+```bash
+docker-compose -f docker-compose.prod.yml down
+docker-compose -f docker-compose.prod.yml up -d --build
+```
+
+### Docker Volume Configuration
+
+The production setup uses the following volume mounts:
+
+| Volume | Host Path | Container Path | Purpose |
+|--------|-----------|----------------|---------|
+| `mongo_data` | Docker managed | `/data/db` | MongoDB data persistence |
+| `chat_images` | `./chat_images/` | `/app/public/images` | Generated image storage |
+
+The `chat_images` folder is created automatically on first run and contains all generated images. This folder can be easily backed up using standard tools.
+
+---
+
+## Configuration
+
+### Environment Variables
+
+All configuration is managed through the `.env` file in the project root.
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OPENROUTER_API_KEY` | Yes | - | Your OpenRouter API key for AI model access |
+| `MONGODB_URI` | Yes | `mongodb://localhost:27017/chathub` | MongoDB connection string. Use `mongodb://mongo_db:27017/chathub` for Docker deployments |
+| `TIMEZONE` | No | `America/Los_Angeles` | IANA timezone for date/time display |
+| `WEATHER_LOCATION` | No | - | City name, zip code, or coordinates for weather injection |
+| `NEXT_PUBLIC_APP_URL` | No | `http://localhost:3031` | Public URL for OpenRouter attribution and absolute URLs. Update for production/Docker (e.g., `http://your-server-ip:3031`) |
+| `HOST_PORT` | No | `3031` | Host port for running tests from host machine. Must match the left side of docker-compose port mapping |
+
+**Example `.env` file:**
+```env
+OPENROUTER_API_KEY=sk-or-v1-abc123def456
+#MONGODB_URI=mongodb://localhost:27017/chathub   ## Use for local development
+MONGODB_URI=mongodb://mongo_db:27017/chathub     ## Use for Docker deployments
+TIMEZONE=America/Phoenix
+WEATHER_LOCATION=Phoenix, AZ
+NEXT_PUBLIC_APP_URL=http://localhost:3031
+HOST_PORT=3031
+```
+
+**Reference: `next.config.js`**
+> *Note: The following is a sample `next.config.js` as of the writing of this documentation. Always refer to the latest version in the repository.*
+
+```javascript
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // Ignore TypeScript errors during build to allow Docker deployment to succeed
+  // (Pre-existing minor type issues in perplexity.ts and RawDataModal.tsx do not affect runtime)
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  // Ignore ESLint errors during build as well
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  // Rewrite image requests to API route to bypass static file caching in production
+  async rewrites() {
+    return [
+      {
+        source: '/images/:path*',
+        destination: '/api/images/:path*',
+      },
+    ];
+  },
+};
+
+module.exports = nextConfig;
+```
+
+Key configuration:
+- `typescript.ignoreBuildErrors`: Allows Docker builds to succeed despite minor type issues
+- `eslint.ignoreDuringBuilds`: Prevents ESLint errors from blocking production builds
+- `rewrites`: Redirects `/images/*` requests to the API route to bypass static file caching in production
+
+### Settings UI Configuration
+
+The application includes a comprehensive Settings UI accessible from the main interface. Settings are stored in MongoDB and take effect immediately without server restart.
+
+**Available Settings:**
+
+1. **Models**
+   - Configure available AI models
+   - Set default models for different tasks
+   - Validate model IDs against provider APIs
+   - Drag-and-drop reordering
+
+2. **Providers**
+   - OpenRouter (built-in, non-editable)
+   - Custom providers (Ollama, LLM Studio, etc.)
+   - Provider endpoint configuration
+   - API key management
+
+3. **Utility LLMs**
+   - Router LLM (default: `openai/gpt-4o-mini`)
+   - Image Generation LLM (default: `google/gemini-3.1-flash-image-preview`)
+
+4. **Theme Colors**
+   - Customizable dark/light theme colors
+   - Live preview
+   - Stored in MongoDB for backup/restore
+
+5. **Global System Prompt**
+   - Custom instructions injected into every chat session
+   - Persistent across threads
+
+6. **Context Settings**
+   - Timezone configuration
+   - Default weather location
+   - Dynamic context injection (date/time/weather)
+
+### Docker Configuration
+
+**Reference: Docker Compose Files**
+> *Note: The following are sample Docker Compose files as of the writing of this documentation. Always refer to the latest versions in the repository.*
+
+**Development (`docker-compose.yml`):**
+```yaml
+services:
+  # 1. Next.js Web App UI & Backend API (Live Development Mode)
+  web-app:
+    build: .
+    container_name: chat_web_app
+    ports:
+      - "3031:3000"  # Map public host port 3031 to internal container port 3000
+    env_file:
+      - .env         # Properly injects everything inside your local .env file
+    # Binds your windows project directory directly inside the container for instant hot-reloading
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    # Forces Next.js into instant hot-reloading dev mode instead of static production builds
+    command: npm run dev
+    depends_on:
+      - mongo_db
+    restart: unless-stopped
+
+  # 2. MongoDB Database Container (Local Storage + Backup Mount)
+  mongo_db:
+    image: mongo:6.0
+    container_name: chat_mongo_db
+    # Expose MongoDB on localhost so local Next.js dev can connect
+    ports:
+      - "27017:27017"
+    # The database container holds the data files AND the backup mounts
+    volumes:
+      - ./data:/data/db
+      - ./backups:/backups
+    restart: unless-stopped
+```
+
+Key features:
+- Hot-reloading enabled
+- Source code mounted as volume
+- MongoDB exposed on port 27017
+- App accessible on port 3031
+
+**Production (`docker-compose.prod.yml`):**
+```yaml
+services:
+  # 1. Next.js Web App (Production Build)
+  web-app:
+    build: .
+    container_name: unified_chat_web
+    ports:
+      - "3031:3000"  # Access the app at http://<target-computer-ip>:3031
+    env_file:
+      - .env         # Loads your API keys and configuration
+    volumes:
+      - ./chat_images:/app/public/images  # Saves images to a local folder for easy backups
+    depends_on:
+      - mongo_db
+    restart: unless-stopped
+    command: sh -c "mkdir -p /app/public/images && chmod -R 755 /app/public/images && npm run start"
+
+  # 2. MongoDB Database Container
+  mongo_db:
+    image: mongo:6.0
+    container_name: unified_chat_mongo
+    # Port 27017 is exposed only if you need to connect an external DB tool. 
+    # You can remove the 'ports' section entirely if the DB should be internal only.
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db  # Persistent storage for your chat history
+    restart: unless-stopped
+
+# Named volume ensures your database survives container restarts and updates
+volumes:
+  mongo_data:
+```
+
+Key features:
+- Optimized production build
+- No source code mounting
+- Persistent volumes for data
+- Image folder mapped to host for easy backups
+- Restart policy: `unless-stopped`
+- Startup command ensures proper file permissions
+
+---
+
+## Usage
+
+### Starting the Application
+
+**Development:**
+```bash
+npm run dev
+```
+
+**Production (Docker):**
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+**Production (Native):**
+```bash
+npm run build
+npm run start
+```
+
+### Basic Features
+
+1. **Create a New Thread**
+   - Click "New Chat" or start typing in the input box
+   - Thread is automatically named based on first message
+
+2. **Send Messages**
+   - Type your message in the input box
+   - Select AI model from dropdown
+   - Click "Dispatch" or press Enter
+
+3. **Switch Models Mid-Chat**
+   - Use the model dropdown to change AI models
+   - Context is preserved across model switches
+
+4. **Web Search**
+   - Ask about current events, news, or real-time information
+   - Router automatically detects and routes to Perplexity Sonar
+   - Results include source citations
+
+5. **Image Generation**
+   - Request image generation (e.g., "Generate an image of...")
+   - Router classifies intent and calls image generation model
+   - Images are saved and displayed in chat
+
+6. **LLM Only Mode**
+   - Toggle "LLM Only" checkbox to bypass router
+   - Skips all context injection and routing
+   - Pure model interaction
+
+7. **Thread Management**
+   - Archive threads to declutter sidebar
+   - Search across all threads
+   - Delete threads with confirmation
+
+8. **Backup & Restore**
+   - Export all data (threads, messages, settings, images) as ZIP
+   - Restore from backup with replace or merge mode
+   - Maximum backup size: 500MB
+
+### Automated Testing
+
+The application includes comprehensive automated testing for the intent router to ensure reliable query classification.
+
+**CLI Test Script:**
+Run the following command to execute automated routing tests from the terminal:
+```bash
+npm run test:routing
+```
+This script runs randomized prompts against the router API to validate routing decisions for:
+- Weather queries
+- Stock price lookups
+- Image generation
+- Direct replies
+- Time/timezone questions
+
+**In-App Testing UI:**
+1. Open the Settings modal from the main chat interface
+2. Navigate to the "Automated Testing" section
+3. Click "Run Tests" to initiate the test suite
+4. View pass/fail results and routing details in real-time
+
+*Note: Test runs automatically create timestamped threads (e.g., "Test Run: 20260606-132219") in your database for easy identification and review.*
+
+### Server Logs
+
+**View Logs in App:**
+1. Click "Server Logs" button in sidebar
+2. View persistent file-based logs
+3. Filter by log level (info, warn, error)
+4. Auto-refresh enabled
+
+**Log File Location:**
+```
+data/logs/server.log
+```
+
+Logs are automatically rotated to prevent excessive disk usage.
+
+---
+
+## API Endpoints
+
+All API endpoints are prefixed with `/api`. The application uses RESTful conventions.
+
+### Chat
+
+#### POST `/api/chat`
+Main chat endpoint for sending messages and receiving AI responses.
+
+**Request Body:**
+```json
+{
+  "threadId": "string (optional, ObjectId)",
+  "threadName": "string (optional)",
+  "messageContent": "string",
+  "selectedModel": "string",
+  "systemInstruction": "string (optional)",
+  "promptName": "string (optional)",
+  "bypassRouter": "boolean (optional)"
+}
+```
+
+**Response:**
+```json
+{
+  "threadId": "string",
+  "response": "string",
+  "routingTool": "string",
+  "perplexityUsed": "boolean",
+  "usage": {
+    "promptTokens": "number",
+    "completionTokens": "number",
+    "totalTokens": "number",
+    "actualCost": "number",
+    "perplexityTokens": "number",
+    "perplexityCost": "number",
+    "imageGenTokens": "number",
+    "imageGenCost": "number",
+    "routerTokens": "number",
+    "routerCost": "number"
+  }
+}
+```
+
+---
+
+### Threads
+
+#### GET `/api/threads`
+List all threads with optional search and pagination.
+
+**Query Parameters:**
+- `search`: string (optional) - Search term
+- `limit`: number (optional, default: 25) - Results per page
+- `offset`: number (optional, default: 0) - Pagination offset
+- `archived`: boolean (optional) - Filter archived threads
+
+**Response:**
+```json
+{
+  "threads": [...],
+  "total": "number"
+}
+```
+
+#### GET `/api/threads/[id]`
+Get a specific thread by ID.
+
+**Response:**
+```json
+{
+  "_id": "string",
+  "name": "string",
+  "currentModel": "string",
+  "systemInstruction": "string",
+  "createdAt": "string",
+  "updatedAt": "string",
+  "archived": "boolean"
+}
+```
+
+#### PUT `/api/threads/[id]`
+Update a thread (name, model, system instruction).
+
+**Request Body:**
+```json
+{
+  "name": "string (optional)",
+  "currentModel": "string (optional)",
+  "systemInstruction": "string (optional)"
+}
+```
+
+#### DELETE `/api/threads/[id]`
+Delete a thread and all its messages.
+
+#### POST `/api/threads/[id]/archive`
+Toggle archive status of a thread.
+
+#### GET `/api/threads/[id]/messages`
+Get messages for a specific thread with pagination.
+
+**Query Parameters:**
+- `limit`: number (optional, default: 50)
+- `offset`: number (optional, default: 0)
+
+**Response:**
+```json
+{
+  "messages": [...],
+  "total": "number"
+}
+```
+
+---
+
+### Settings
+
+#### GET `/api/settings`
+Get all settings (models, providers, theme, prompts).
+
+**Response:**
+```json
+{
+  "models": [...],
+  "providers": [...],
+  "theme": "string",
+  "themeColors": {...},
+  "globalSystemPrompt": "string",
+  "routerModel": "string",
+  "imageGenerationModel": "string",
+  "timezone": "string",
+  "weatherLocation": "string"
+}
+```
+
+#### POST `/api/settings`
+Update settings.
+
+**Request Body:**
+```json
+{
+  "models": [...],
+  "providers": [...],
+  "theme": "string",
+  "themeColors": {...},
+  "globalSystemPrompt": "string",
+  "routerModel": "string",
+  "imageGenerationModel": "string",
+  "timezone": "string",
+  "weatherLocation": "string"
+}
+```
+
+#### GET `/api/settings/export`
+Export all data as ZIP file (threads, messages, settings, prompts, images).
+
+**Response:** Binary ZIP file download
+
+**Maximum Size:** 500MB
+
+#### POST `/api/settings/import`
+Import data from ZIP file (backup restore).
+
+**Request:** Multipart form data with ZIP file
+
+**Query Parameters:**
+- `mode`: string - "replace" or "merge"
+
+---
+
+### Prompts
+
+#### GET `/api/prompts`
+Get all saved prompts.
+
+**Response:**
+```json
+{
+  "prompts": [...]
+}
+```
+
+#### POST `/api/prompts`
+Create a new saved prompt.
+
+**Request Body:**
+```json
+{
+  "name": "string",
+  "content": "string"
+}
+```
+
+#### PUT `/api/prompts/[id]`
+Update a saved prompt.
+
+#### DELETE `/api/prompts/[id]`
+Delete a saved prompt.
+
+---
+
+### Images
+
+#### GET `/api/images`
+List all generated images with pagination.
+
+**Query Parameters:**
+- `limit`: number (optional, default: 50)
+- `offset`: number (optional, default: 0)
+
+**Response:**
+```json
+{
+  "images": [
+    {
+      "filename": "string",
+      "url": "string",
+      "createdAt": "string"
+    }
+  ],
+  "total": "number"
+}
+```
+
+#### GET `/api/images/[filename]`
+Serve a specific image file.
+
+**Response:** Binary image file with appropriate Content-Type header
+
+**Supported Formats:** PNG, JPEG, GIF, WebP
+
+---
+
+### Costs
+
+#### GET `/api/costs`
+Get aggregated cost breakdown across threads.
+
+**Query Parameters:**
+- `scope`: string - "active", "archived", or "all"
+
+**Response:**
+```json
+{
+  "totalCost": "number",
+  "totalTokens": "number",
+  "modelBreakdown": {...},
+  "threadCount": "number"
+}
+```
+
+---
+
+### Logs
+
+#### GET `/api/logs`
+Get server logs with filtering.
+
+**Query Parameters:**
+- `level`: string (optional) - "info", "warn", "error"
+- `limit`: number (optional, default: 100)
+
+**Response:**
+```json
+{
+  "logs": [...]
+}
+```
+
+---
+
+### Testing
+
+#### POST `/api/test/routing`
+Run automated routing tests from the UI.
+
+**Response:**
+```json
+{
+  "threadName": "string",
+  "threadId": "string",
+  "summary": {
+    "passed": "number",
+    "failed": "number",
+    "total": "number"
+  },
+  "results": [...]
+}
+```
+
+---
+
+### Documentation
+
+#### GET `/api/readme`
+Get README content for in-app display.
+
+**Response:**
+```json
+{
+  "content": "string"
+}
+```
+
+---
+
+## Troubleshooting
+
+### Port Already in Use
+
+**Error:** `EADDRINUSE: address already in use :::3031`
+
+**Cause:** Another process (Docker container or previous dev server) is using port 3031.
+
+**Solution:**
+
+1. **Stop Docker containers:**
+   ```bash
+   docker-compose -f docker-compose.prod.yml down
+   ```
+
+2. **Kill process using the port (PowerShell):**
+   ```powershell
+   Get-NetTCPConnection -LocalPort 3031 -ErrorAction SilentlyContinue | 
+     Select-Object OwningProcess -Unique | 
+     ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+   ```
+
+3. **Kill process using the port (Linux/macOS):**
+   ```bash
+   lsof -ti:3031 | xargs kill -9
+   ```
+
+---
+
+### Images Not Displaying in Production
+
+**Symptom:** Image generation succeeds but images show as broken icons.
+
+**Cause:** Next.js production static file caching or file permissions issue.
+
+**Solution:**
+
+1. **Rebuild container with latest fixes:**
+   ```bash
+   docker-compose -f docker-compose.prod.yml down
+   docker-compose -f docker-compose.prod.yml up -d --build
+   ```
+
+2. **Verify image folder exists and has correct permissions:**
+   ```bash
+   ls -la ./chat_images
+   ```
+
+3. **Check container logs for errors:**
+   ```bash
+   docker logs unified_chat_web --tail 100
+   ```
+
+4. **Verify image was saved:**
+   ```bash
+   docker exec unified_chat_web ls -la /app/public/images/
+   ```
+
+---
+
+### MongoDB Connection Failed
+
+**Error:** `MongoNetworkError: failed to connect to server`
+
+**Cause:** MongoDB is not running or connection string is incorrect.
+
+**Solution:**
+
+1. **Check if MongoDB is running:**
+   ```bash
+   # Docker
+   docker ps | grep mongo
+   
+   # Native
+   systemctl status mongod
+   ```
+
+2. **Verify connection string in `.env`:**
+   ```env
+   # Development (native MongoDB)
+   MONGODB_URI=mongodb://localhost:27017/chathub
+   
+   # Production (Docker MongoDB)
+   MONGODB_URI=mongodb://mongo_db:27017/chathub
+   ```
+
+3. **Test MongoDB connection:**
+   ```bash
+   mongosh mongodb://localhost:27017/chathub
+   ```
+
+---
+
+### Backup File Too Large
+
+**Error:** `Backup file too large. Maximum size is 500MB`
+
+**Cause:** Backup ZIP file exceeds the maximum allowed size.
+
+**Solution:**
+
+1. **Archive old threads** to reduce backup size:
+   - Use the archive feature in the UI
+   - Export only active threads
+
+2. **Delete unnecessary images:**
+   - Use the Image Gallery modal to browse and delete old images
+   - Images are stored in `./chat_images/` (production) or `public/images/` (development)
+
+3. **Split backup manually:**
+   - Export threads separately from images
+   - Use database tools for large datasets
+
+---
+
+### Docker Volume Permission Issues
+
+**Error:** Images saved but not accessible, or permission denied errors.
+
+**Cause:** Docker volume mount has incorrect permissions.
+
+**Solution:**
+
+1. **Fix permissions on host:**
+   ```bash
+   chmod -R 755 ./chat_images
+   ```
+
+2. **Rebuild container with permission fix:**
+   ```bash
+   docker-compose -f docker-compose.prod.yml down
+   docker-compose -f docker-compose.prod.yml up -d --build
+   ```
+
+3. **Verify volume mount:**
+   ```bash
+   docker inspect unified_chat_web | grep -A 10 Mounts
+   ```
+
+---
+
+### OpenRouter API Errors
+
+**Error:** `API Error [401]: Invalid API key` or rate limit errors.
+
+**Cause:** Invalid API key or rate limiting.
+
+**Solution:**
+
+1. **Verify API key in `.env`:**
+   ```env
+   OPENROUTER_API_KEY=sk-or-v1-your_actual_key_here
+   ```
+
+2. **Check API key at OpenRouter:**
+   - Visit https://openrouter.ai/keys
+   - Verify key is active and has sufficient credits
+
+3. **Set proper HTTP-Referer:**
+   ```env
+   NEXT_PUBLIC_APP_URL=http://your-domain.com:3031
+   ```
+   This ensures OpenRouter correctly attributes your traffic for rate limiting.
+
+---
+
+### TypeScript Build Errors
+
+**Error:** TypeScript errors during `npm run build`
+
+**Cause:** Pre-existing minor type issues in the codebase.
+
+**Solution:**
+
+The `next.config.js` is configured to ignore build errors:
+```javascript
+typescript: {
+  ignoreBuildErrors: true,
+}
+```
+
+If you need to fix type errors:
+1. Run `npm run typecheck` to see all errors
+2. Fix errors in reported files
+3. Remove `ignoreBuildErrors` from `next.config.js`
+
+---
+
+### Hot Reloading Not Working (Development)
+
+**Symptom:** Changes to code don't reflect in browser.
+
+**Cause:** Docker volume mount issue or Next.js cache.
+
+**Solution:**
+
+1. **Verify volume mount in `docker-compose.yml`:**
+   ```yaml
+   volumes:
+     - .:/app
+     - /app/node_modules
+     - /app/.next
+   ```
+
+2. **Clear Next.js cache:**
+   ```bash
+   rm -rf .next
+   npm run dev
+   ```
+
+3. **Restart container:**
+   ```bash
+   docker compose down
+   docker compose up
+   ```
+
+---
+
+### Weather Injection Not Working
+
+**Symptom:** Weather information not appearing in system context.
+
+**Cause:** `WEATHER_LOCATION` not set or wttr.in API unavailable.
+
+**Solution:**
+
+1. **Set weather location in `.env`:**
+   ```env
+   WEATHER_LOCATION=Phoenix, AZ
+   ```
+
+2. **Or configure via Settings UI:**
+   - Open Settings modal
+   - Navigate to Context Settings
+   - Enter weather location
+
+3. **Test wttr.in API:**
+   ```bash
+   curl "wttr.in/Phoenix, AZ?format=3"
+   ```
+
+4. **Leave empty to disable:**
+   ```env
+   WEATHER_LOCATION=
+   ```
+
+---
+
+### Database Backup Not Running
+
+**Symptom:** Automated backups not appearing in `./backups/` folder.
+
+**Cause:** Backup daemon not configured or permissions issue.
+
+**Solution:**
+
+1. **Check backup folder permissions:**
+   ```bash
+   chmod -R 755 ./backups
+   ```
+
+2. **Verify backup schedule in Docker:**
+   ```bash
+   docker logs chat_mongo_db | grep backup
+   ```
+
+3. **Manual backup:**
+   - Use the Export feature in Settings UI
+   - Or use `mongodump` directly
+
+---
+
+### Performance Issues with Large Threads
+
+**Symptom:** Slow loading for threads with many messages.
+
+**Cause:** Loading all messages at once without pagination.
+
+**Solution:**
+
+1. **Use pagination:**
+   - Messages are loaded in batches (default: 50)
+   - Click "Load More" to see older messages
+
+2. **Archive old threads:**
+   - Reduces active thread count
+   - Improves sidebar performance
+
+3. **Clear browser cache:**
+   - Press F5 to refresh
+   - Clear browser cache if issues persist
+
+---
+
+## Support
+
+For issues, questions, or contributions:
+
+- **Application Page:** [https://35sites.com/applications/unified-aichat-hub/](https://35sites.com/applications/unified-aichat-hub/)
+- **GitHub Repository:** [https://github.com/jorper98/unified-AIChat-Hub](https://github.com/jorper98/unified-AIChat-Hub)
+- **License:** MIT License (see `license.md`)
+- **Copyright:** (c) 2026 Jorge Pereira (35sites.com LLC)
+
+---
+
+*Built with Next.js and powered by OpenRouter*

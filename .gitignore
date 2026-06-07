@@ -1,0 +1,25 @@
+node_modules/
+.next/
+.env
+.vscode/
+.idea/
+.data/
+.DS_Store
+*.log
+*.tmp
+*.bak
+*.swp
+backups/
+old-docker-compose - Copy.yml
+data/
+public/images/
+tsconfig.tsbuildinfo
+.kilo/
+*.wt
+todo.md
+deploy/
+old*
+devnotes/
+
+
+
