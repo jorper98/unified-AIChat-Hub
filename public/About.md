@@ -1,9 +1,9 @@
 # Unified Chat Hub
 
-## Version 0.2.8
+## Version 0.3.0
 
 ### About
-Unified Chat Hub is a self-hosted, private AI development workspace and model playground built with Next.js 14, Tailwind CSS, and MongoDB. It provides a unified interface for interacting with multiple AI models through OpenRouter, with an intelligent intent router that classifies queries and routes them to web search or direct LLM response.
+Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a unified interface for interacting with multiple LLM models within the same chat (Thread). You can search across all chats and track the tokens and costs of your interactions. It relies on OpenRouter, featuring an intelligent intent router that classifies queries and routes them to different tools or your directly selected LLM response.
 
 ### Features
 
@@ -41,7 +41,8 @@ Unified Chat Hub is a self-hosted, private AI development workspace and model pl
 ### Author
 Jorge Pereira  
 35sites.com LLC  
-Website: [https://35sites.com](https://35sites.com)
+Website: [https://35sites.com/applications/unified-aichat-hub/](https://35sites.com/applications/unified-aichat-hub/)  
+Repository: [https://github.com/jorper98/unified-AIChat-Hub](https://github.com/jorper98/unified-AIChat-Hub)
 
 ### License
 // Copyright (c) 2026 Jorge Pereira (35sites.com LLC). Licensed under the MIT License.

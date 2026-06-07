@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.0
+- Added prominent security notice to documentation emphasizing self-hosted, private environment deployment requirements
+- Updated all website and repository references to point to the official application page and GitHub repository
+- Bumped version to 0.3.0
+
 ## v0.2.8
 - Fixed critical DB connection race condition: wrapped connection promise in `try...finally` to prevent permanent rejection caching on failure
 - Replaced dynamic import with static import for `getDb` in chat route for better performance and standard Next.js practices
