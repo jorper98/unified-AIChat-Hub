@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.1
+- Added Over-The-Air (OTA) update feature: container can now download and apply updates directly from a configured GitHub Release zip URL.
+- Added "Update" button in the About modal to trigger the OTA update process with visual feedback.
+- Created `scripts/update-app.js` to handle secure zip download, extraction, dependency sync (`npm install`), and file copying while preserving local data (`.env`, `data`, `backups`).
+- Added `UPDATE_ZIP_URL` environment variable configuration for custom update source targeting.
+- Updated `Dockerfile` to include `curl` and `unzip` utilities for enhanced container debugging and update support.
+- Bumped version to 0.3.1.
+
 ## v0.3.0
 - Added prominent security notice to documentation emphasizing self-hosted, private environment deployment requirements
 - Updated all website and repository references to point to the official application page and GitHub repository

@@ -1,6 +1,6 @@
 {
   "name": "unified-chat-hub",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "scripts": {
     "predev": "node -e \"console.log('\\nStarting Unified Chat Hub v' + require('./package.json').version + '\\n')\"",
