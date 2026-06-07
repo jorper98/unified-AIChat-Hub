@@ -1,8 +1,17 @@
 # Changelog
 
+## v0.3.4
+- Fixed Over-The-Air (OTA) update script: resolved `SyntaxError` by wrapping top-level `await` in an async function.
+- Fixed OTA update script to properly handle HTTP 302 redirects from GitHub release assets using native `fetch`.
+- Fixed OTA update script to correctly handle flat ZIP file structures without throwing `ENOTDIR` errors.
+- Updated OTA update script to include `.next` and `node_modules` in the deployment package, ensuring compiled production code is properly overwritten during updates.
+- Added `devnotes` folder and files starting with `old` to the deployment packaging exclusion list to keep release artifacts clean.
+- Configured OTA update process to automatically trigger a Docker container restart upon successful completion (leveraging `restart: unless-stopped`).
+- Bumped version to 0.3.4.
+
 ## v0.3.3
 - Bumped version to 0.3.3.
-- Changed about.md  to test the OTA update process.
+- Changed about.md to test the OTA update process.
 
 ## v0.3.2
 - Added customizable BG Secondary and BG Tertiary colors to Settings > Theme Colors, allowing users to control assistant message bubble backgrounds and hover states in both dark and light modes.
