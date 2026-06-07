@@ -1,6 +1,6 @@
 # Unified Chat Hub
 
-## Version 0.3.2
+## Version 0.3.3
 
 ### About
 Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a unified interface for interacting with multiple LLM models within the same chat (Thread). You can search across all chats and track the tokens and costs of your interactions. It relies on OpenRouter, featuring an intelligent intent router that classifies queries and routes them to different tools or your directly selected LLM response.
@@ -22,13 +22,11 @@ Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a un
 - Web search via Perplexity Sonar with XML context injection and clickable source citations
 - LLM Only mode: bypass router and context injection for pure model interaction
 - Server Logs: persistent file-based logging with standalone popup viewer
-- Dark/light theme support
 - Backup & Restore with ZIP export/import
 - Able to fully deploy via Docker container with option to place data on local folder
 - In-App Automated Testing: One-click UI testing in Settings to verify routing, context injection, and API integrations
 - Environment-aware configuration: Dynamic URL and port handling for seamless local, Docker, and production deployments
 - Reliable image serving in production: API-based image delivery bypasses static file caching
-- Increased backup capacity: Backup file size limit raised to 500MB
 - Over-The-Air (OTA) Updates: Built-in update mechanism to download and apply new versions directly from a GitHub Release zip URL via the About modal, with automatic dependency syncing and zero-config latest release detection.
 - Customizable theme colors: Fully configurable dark and light mode colors including background, surface, text, accent, border, and secondary/tertiary backgrounds via the Settings UI.
 
