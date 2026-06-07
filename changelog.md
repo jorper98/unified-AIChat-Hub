@@ -1,0 +1,196 @@
+# Changelog
+
+## v0.3.0
+- Added prominent security notice to documentation emphasizing self-hosted, private environment deployment requirements
+- Updated all website and repository references to point to the official application page and GitHub repository
+- Bumped version to 0.3.0
+
+## v0.2.8
+- Fixed critical DB connection race condition: wrapped connection promise in `try...finally` to prevent permanent rejection caching on failure
+- Replaced dynamic import with static import for `getDb` in chat route for better performance and standard Next.js practices
+- Added `predev` and `prestart` scripts to log application version on startup, complying with developer guidelines
+- Added `lint` and `typecheck` scripts to enforce code quality standards
+- Enhanced automated testing documentation in `docs.md` to clearly document CLI and in-app testing
+- Bumped version to 0.2.8
+
+## v0.2.7
+- Fixed Next.js production image caching issue: new API route (`/api/images/[filename]`) serves images dynamically, bypassing static file cache
+- Added rewrite rule in `next.config.js` to redirect `/images/*` requests to the new API route
+- Increased backup file size limit from 50MB to 500MB in import API route
+- Added `chat_images` bind mount volume to `docker-compose.prod.yml` for persistent image storage
+- Added startup `chmod` command in production Docker config to fix image file permissions
+- Bumped version to 0.2.7
+
+## v0.2.6
+- Made test script environment-aware: auto-detects Docker vs Host and supports `HOST_PORT` override for seamless multi-environment testing
+- Made OpenRouter `HTTP-Referer` headers dynamic using `NEXT_PUBLIC_APP_URL` for accurate production rate-limit attribution
+- Removed `ROUTER_TIMEOUT_MS` and `PERPLEXITY_TIMEOUT_MS` from `.env.sample` (now handled by app defaults/settings)
+- Added `NEXT_PUBLIC_APP_URL` and `HOST_PORT` to `.env.sample` for flexible custom port and URL configuration
+- Bumped version to 0.2.6
+
+## v0.2.5
+- Fixed light mode support for Global Cost Breakdown and Image Gallery modals
+- Moved sidebar icons to second line (right-aligned), version number next to title
+- Made APP_VERSION dynamic by importing from package.json
+- Updated license to MIT across readme.md, About.md, and created license.md
+- Added favicon.ico to fix 404 error
+- Added Roadmap.md for development tracking
+
+## v0.2.4
+- Added Global Cost Breakdown modal to view aggregated token usage and costs across Active, Archived, and All chats
+- Added Image Gallery modal to browse, view, download, and delete generated images in `/public/images`
+- Added dedicated API routes for cost aggregation and image management
+
+## v0.2.3
+- Added in-app "Automated Testing" UI in Settings to run end-to-end routing and context tests with one click
+- Fixed backup/restore ObjectId parsing errors to safely handle both hex IDs and string IDs (like "global_settings")
+- Fixed backup restore file picker to correctly accept `.zip` files
+- Enhanced deployment packaging script to exclude `.env` and `.kilo` for security and cleaner transfers
+- Added `next.config.js` with `ignoreBuildErrors: true` to ensure smooth Docker production builds
+
+## v0.2.2
+- Refactored monolithic 834-line chat route into 4 focused, modular libraries (`thread.ts`, `model-providers.ts`, `image-processing.ts`, `response-parser.ts`)
+- Replaced fragile, overlapping regex chains for image extraction with a robust, recursive JSON parsing approach
+- Added automated routing test script with randomized prompts and timestamped thread naming for reliable end-to-end verification
+- Migrated `TIMEZONE` and `WEATHER_LOCATION` configuration from `.env` to the database-backed Settings UI
+
+## v0.2.1
+- Added automated routing test script (`npm run test:routing`) with randomized prompts for weather, stocks, and image generation
+- Test runs now create cleanly named, timestamped threads (e.g., "Test Run: YYYYMMDD-HHMMSS") for easy identification
+- Migrated `TIMEZONE` and `WEATHER_LOCATION` configuration from `.env` to the database-backed Settings UI for dynamic, no-restart updates
+- Fixed router JSON parsing failures for image generation by increasing `max_tokens` and adding robust regex fallbacks for truncated responses
+- Fixed missing time injection in system context prompt (was calculating `timeStr` but not including it in the output)
+
+## v0.2.0
+- Refactored monolithic 1273-line main page component into 11 focused, modular components for improved maintainability and readability
+- Extracted shared TypeScript interfaces into `src/types.ts` and utility functions into `src/lib/utils.ts`
+- Decomposed UI into dedicated components: `ThreadSidebar`, `MessageArea`, `ChatInput`, `PromptModal`, `ArchiveModal`, `DeleteConfirmModal`, `AboutModal`, `ReadmeModal`, and `SettingsModal`
+- Reduced main `page.tsx` file size by ~45% (down to 702 lines) while preserving all existing functionality and state management
+
+## v0.1.9
+- Added thread and message pagination with configurable limits (25, 50, 100) and "Load More" UI controls to improve performance and reduce memory usage
+- Fixed MongoDB connection race condition by implementing a promise-based connection lock to prevent duplicate connections under concurrent load
+- Replaced unsafe `as any` type casts with proper TypeScript interfaces (`SettingsDocument`, `ThreadDocument`, `MessageDocument`) for better type safety
+- Made router and Perplexity API timeouts configurable via `ROUTER_TIMEOUT_MS` and `PERPLEXITY_TIMEOUT_MS` environment variables
+- Removed flawed client-side API secret implementation to prevent security vulnerabilities, deferring to network-level security for self-hosted deployments
+
+## v0.1.8
+- Added Settings modal in About page to display current configuration (Models, Providers, Utility LLMs, Global System Prompt, Theme, and Chat/Archive statistics)
+
+## v0.1.7
+- Utility LLMs Settings Section: configurable Router LLM and Image Generation LLM via settings UI
+- Image Generation Routing: router classifies intent as image_generation and calls dedicated image model
+- Router model is now configurable (previously hardcoded to gpt-4o-mini)
+- Dynamic pricing for router based on configured model
+- Image generation cost tracking in CostCalculator
+- Tool use indicators in chat: shows direct, web_search (Perplexity), or image (model-name)
+- Web search context truncation and history overflow protection
+- Single source of truth for utility model settings (MongoDB)
+
+## v0.1.6
+- Intelligent Intent Router: lightweight GPT-4o Mini classifier routes queries to web_search or direct_reply
+- Structured JSON schema routing with auto-fallback on timeout/error
+- Web search context injection via XML tags (`<web_search_context>`) with source citations
+- Dual Perplexity formats: full_answer (factual queries) and snippets (complex/analytical queries)
+- Perplexity citation markers replaced with clickable markdown links
+- LLM Only mode: checkbox bypass to skip router and all context injection
+- Server Logs: persistent file-based logging to `data/logs/server.log` with auto-rotation
+- Standalone server logs popup window with live auto-refresh, level filtering, and clear
+- Router and Perplexity cost tracking in CostCalculator (routerTokens, routerCost, perplexityTokens, perplexityCost)
+- Cost decimal precision increased to 10 decimal places
+- Date/time anchor injected into system prompt for real-time awareness
+
+## v0.1.5
+- Auto-continue Perplexity mode: after a recheck, follow-ups automatically go through Perplexity
+- Perplexity mode persists per-thread in MongoDB (survives page reloads)
+- Exit Perplexity mode with: "switch back", "exit perplexity", "stop perplexity", "back to normal", etc.
+- Perplexity follow-ups include full conversation history for context-aware responses
+- 12 exit trigger phrases detected
+- Fixed: userQuery not being added to Perplexity API messages array (caused 500 errors)
+
+## v0.1.4
+- Perplexity recheck trigger: say "recheck with Perplexity", "ask Perplexity", "use Perplexity", etc.
+- Recheck finds the PREVIOUS user question in thread history and runs it through Perplexity Sonar
+- Skips the normal model call when recheck is triggered (saves tokens and time)
+- 19 trigger phrases detected (recheck with/using, ask, use, try, search, look it up, etc.)
+- Cost tracking works for recheck requests (shown in CostCalculator)
+
+## v0.1.3
+- Perplexity API fallback: when the model expresses uncertainty, Perplexity Sonar is queried automatically via OpenRouter
+- No separate Perplexity API key needed — uses existing OPENROUTER_API_KEY
+- Real-time web search answers injected when the model says "I don't know" or similar
+- 35 uncertainty detection patterns (weather, real-time data, browsing, etc.)
+- 10-second timeout on Perplexity calls to avoid blocking responses
+- Falls back to original response if Perplexity fails
+- Perplexity cost tracking in CostCalculator: token usage and cost shown as separate row
+- Perplexity Sonar via OpenRouter pricing: $1/1M input tokens, $1/1M output tokens
+
+## v0.1.2
+- Global System Prompt feature: custom instructions injected into every chat session
+- Dynamic context injection: current date/time (timezone-aware) and weather (via wttr.in)
+- New settings section for managing global system prompt
+- Environment variables: TIMEZONE and WEATHER_LOCATION for context customization
+- Weather API with 3-second timeout (fails gracefully if unavailable)
+
+## v0.1.1
+- Theme colors moved from localStorage to MongoDB for full backup/restore coverage
+- Backup ZIP now includes dark/light theme color configurations
+- Restore process now applies saved theme colors automatically
+
+## v0.1.0
+- Text-to-image model support: automatic extraction from OpenRouter/Gemini API responses
+- Smart context optimization: base64 images saved to public/images/, replaced with lightweight markdown links
+- Image cost tracking in cost calculator (actual OpenRouter costs + image token counts)
+- Fixed model dropdown: non-OpenRouter models (Ollama, LLM Studio) now appear correctly
+- Settings Model Configuration: single table layout with drag-and-drop row reordering
+- Model ID validation: per-row check and validate-all against provider APIs
+- Invalid model IDs shown in red with warning indicators
+- Model search and provider filter in settings
+- Backup & Restore: export all data + images as ZIP, restore with replace or merge mode
+- public/images/ folder added to .gitignore
+
+## v0.0.9
+- Theme color configuration (customizable dark/light colors with live preview)
+- Settings sidebar navigation (Models, Providers, Theme Colors sections)
+- OpenRouter as fixed built-in provider (non-editable, auto-configured)
+- Custom provider management (add/edit/delete Ollama, LLM Studio, etc.)
+- Provider endpoint fallback (uses config defaults when settings endpoint is empty)
+- Settings page moved to unified sidebar layout
+- Fixed null content errors in message handling
+- Fixed hydration mismatch for theme persistence
+
+## v0.0.8
+- Prompt name display after model (shows saved prompt used for response)
+- System prompt restoration when loading existing threads
+- Prompt name persistence across thread loads
+- Active prompt indicator badge in UI
+- Raw data modal now includes thread metadata and system instructions
+- Fixed MongoDB ObjectId serialization for saved prompts API
+- System instruction tracking per message in database
+
+## v0.0.7
+- Dark/light theme toggle with localStorage persistence
+- Chat auto-scrolls to latest response
+- Footer font size increased
+- Thread metadata (systemInstruction, currentModel, dates) in raw data view
+- System instruction shown per message in chat
+
+## v0.0.6
+- Smart thread naming from first message content
+- Inline thread rename with hover edit button
+- Relative date display (e.g., "2h ago") next to thread ID
+- Markdown rendering with syntax highlighting for code blocks
+- Copy button on assistant responses (hover to reveal)
+- Token estimation with context usage bar
+- Cost calculator modal with model pricing ($ button)
+- Local development support (port 3031, MongoDB in Docker)
+
+## v0.0.5
+- Initial commit of unified-chat sandbox
+- Next.js 14 app with MongoDB integration
+- Dynamic model hot-swapping via OpenRouter
+- Persistent settings panel with MongoDB storage
+- Global message search across chat history
+- Automated database backup daemon via Docker
+- Thread management with sidebar history
+- Tailwind CSS dark mode UI

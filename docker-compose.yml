@@ -1,0 +1,32 @@
+services:
+  # 1. Next.js Web App UI & Backend API (Live Development Mode)
+  web-app:
+    build: .
+    container_name: chat_web_app
+    ports:
+      - "3031:3000"  # Map public host port 3031 to internal container port 3000
+    env_file:
+      - .env         # Properly injects everything inside your local .env file
+    # Binds your windows project directory directly inside the container for instant hot-reloading
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    # Forces Next.js into instant hot-reloading dev mode instead of static production builds
+    command: npm run dev
+    depends_on:
+      - mongo_db
+    restart: unless-stopped
+
+  # 2. MongoDB Database Container (Local Storage + Backup Mount)
+  mongo_db:
+    image: mongo:6.0
+    container_name: chat_mongo_db
+    # Expose MongoDB on localhost so local Next.js dev can connect
+    ports:
+      - "27017:27017"
+    # The database container holds the data files AND the backup mounts
+    volumes:
+      - ./data:/data/db
+      - ./backups:/backups
+    restart: unless-stopped
