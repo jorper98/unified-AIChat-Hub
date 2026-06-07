@@ -184,7 +184,7 @@ export function ThreadSidebar({
                   </button>
                   <button
                     onClick={() => cancelRename()}
-                    className={`text-[9px] px-1.5 py-0.5 rounded ${isDark ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-300 hover:bg-gray-400 text-gray-700'}`}
+                    className={`text-[9px] px-1.5 py-0.5 rounded ${isDark ? 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]' : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]'}`}
                   >
                     Cancel
                   </button>
@@ -260,7 +260,7 @@ export function ThreadSidebar({
           {hasMoreThreads && (
             <button
               onClick={loadMoreThreads}
-              className={`w-full text-xs font-semibold py-1.5 rounded border transition ${isDark ? 'bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-300'}`}
+              className={`w-full text-xs font-semibold py-1.5 rounded border transition ${isDark ? 'bg-[var(--surface)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-color)]' : 'bg-[var(--surface-alt)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] border-[var(--border-alt)]'}`}
             >
               Load More Threads
             </button>

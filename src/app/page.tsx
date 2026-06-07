@@ -52,6 +52,7 @@ export default function UnifiedChatInterface() {
   const [renameValue, setRenameValue] = useState('');
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [mounted, setMounted] = useState(false);
+  const [themeColors, setThemeColors] = useState<any>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -102,6 +103,9 @@ export default function UnifiedChatInterface() {
     fetch('/api/settings')
       .then(res => res.json())
       .then(data => {
+        if (data.themeColors) {
+          setThemeColors(data.themeColors);
+        }
         const modelList = data.models || data.selectedModels || [];
         const formatted = modelList.map((m: any) => ({
           id: typeof m === 'string' ? m : m.id,
@@ -146,6 +150,26 @@ export default function UnifiedChatInterface() {
       loadThread(savedThreadId);
     }
   }, []);
+
+  useEffect(() => {
+    const colors = themeColors 
+      ? (theme === 'dark' ? themeColors.dark : themeColors.light)
+      : null;
+    
+    const root = document.documentElement;
+    root.style.setProperty('--bg-background', colors?.background || (theme === 'dark' ? '#111827' : '#f9fafb'));
+    root.style.setProperty('--bg-surface', colors?.surface || (theme === 'dark' ? '#1f2937' : '#ffffff'));
+    root.style.setProperty('--bg-surface-alt', colors?.surfaceAlt || (theme === 'dark' ? '#030712' : '#f3f4f6'));
+    root.style.setProperty('--bg-secondary', colors?.bgSecondary || (theme === 'dark' ? '#374151' : '#d1d5db'));
+    root.style.setProperty('--bg-tertiary', colors?.bgTertiary || (theme === 'dark' ? '#4b5563' : '#9ca3af'));
+    root.style.setProperty('--text-primary', colors?.textPrimary || (theme === 'dark' ? '#f3f4f6' : '#111827'));
+    root.style.setProperty('--text-secondary', colors?.textSecondary || (theme === 'dark' ? '#d1d5db' : '#374151'));
+    root.style.setProperty('--text-muted', colors?.textMuted || (theme === 'dark' ? '#6b7280' : '#9ca3af'));
+    root.style.setProperty('--color-accent', colors?.accent || '#6366f1');
+    root.style.setProperty('--color-accent-hover', colors?.accentHover || (theme === 'dark' ? '#818cf8' : '#4f46e5'));
+    root.style.setProperty('--border-color', colors?.border || (theme === 'dark' ? '#374151' : '#e5e7eb'));
+    root.style.setProperty('--border-alt', colors?.borderAlt || (theme === 'dark' ? '#1f2937' : '#d1d5db'));
+  }, [theme, themeColors]);
 
   useEffect(() => {
     fetch('/About.md?t=' + Date.now())
@@ -631,7 +655,7 @@ export default function UnifiedChatInterface() {
       </div>
 
       <footer className={`fixed bottom-0 left-0 right-0 border-t py-2 text-center text-xs ${isDark ? 'bg-gray-950 border-gray-800 text-gray-400' : 'bg-white border-gray-200 text-gray-500'}`}>
-        By <a href="https://35sites.com/" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 transition">Jorge Pereira (35sites.com LLC)</a>
+        By <a href="https://35sites.com/applications/unified-aichat-hub/" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 transition">Jorge Pereira (35sites.com LLC)</a>
       </footer>
 
       <RawDataModal

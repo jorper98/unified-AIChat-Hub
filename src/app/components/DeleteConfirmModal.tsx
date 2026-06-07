@@ -24,7 +24,7 @@ export function DeleteConfirmModal({
         <h3 className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>Delete Thread</h3>
         <p className={`text-xs mb-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>This will permanently delete this thread and all its messages. This cannot be undone.</p>
         <div className="flex gap-2 justify-end">
-          <button onClick={onClose} className={`text-xs px-3 py-1.5 rounded ${isDark ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>Cancel</button>
+          <button onClick={onClose} className={`text-xs px-3 py-1.5 rounded ${isDark ? 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]' : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'}`}>Cancel</button>
           <button onClick={() => deleteThread(deleteConfirmId)} className="text-xs px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-500">Delete</button>
         </div>
       </div>

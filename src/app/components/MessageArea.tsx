@@ -26,7 +26,7 @@ export function MessageArea({
           <div className="flex justify-center mb-4">
             <button
               onClick={loadOlderMessages}
-              className={`text-xs font-semibold py-2 px-4 rounded border transition ${isDark ? 'bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-300'}`}
+              className={`text-xs font-semibold py-2 px-4 rounded border transition ${isDark ? 'bg-[var(--surface)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-color)]' : 'bg-[var(--surface-alt)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-alt)]'}`}
             >
               Load Older Messages
             </button>
@@ -42,9 +42,9 @@ export function MessageArea({
               <div className={`px-4 py-3 rounded-lg text-sm leading-relaxed ${
                 msg.role === 'user' 
                   ? (isDark ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-indigo-500 text-white rounded-br-none') 
-                  : (isDark ? 'bg-gray-800 text-gray-200 rounded-bl-none' : 'bg-gray-700 text-gray-100 rounded-bl-none')
+                  : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] rounded-bl-none'
               }`}>
-                <MarkdownRenderer content={msg.content} isUser={msg.role === 'user'} />
+                <MarkdownRenderer content={msg.content} isUser={msg.role === 'user'} isDark={isDark} />
               </div>
               {msg.modelUsed && (
                 <div className={`text-[10px] font-mono px-1 mt-0.5 space-y-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>

@@ -67,7 +67,7 @@ export function ArchiveModal({
               {hasMoreArchivedThreads && (
                 <button
                   onClick={loadMoreArchivedThreads}
-                  className={`w-full text-xs font-semibold py-1.5 rounded border transition ${isDark ? 'bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-700' : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-300'}`}
+                  className={`w-full text-xs font-semibold py-1.5 rounded border transition ${isDark ? 'bg-[var(--surface)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-color)]' : 'bg-[var(--surface-alt)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] border-[var(--border-alt)]'}`}
                 >
                   Load More Archived Threads
                 </button>
