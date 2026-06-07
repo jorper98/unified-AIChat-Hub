@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.3
+- Bumped version to 0.3.3.
+- Changed about.md  to test the OTA update process.
+
 ## v0.3.2
 - Added customizable BG Secondary and BG Tertiary colors to Settings > Theme Colors, allowing users to control assistant message bubble backgrounds and hover states in both dark and light modes.
 - Fixed light mode text visibility: made `prose-invert` conditional in MarkdownRenderer so message text renders correctly in light mode.
