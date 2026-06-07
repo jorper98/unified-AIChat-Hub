@@ -29,19 +29,20 @@ $DestinationPath = Join-Path $DeployFolder "unified-chat-deploy-v$Version.zip"
 # Your chat history can be migrated later using the app's built-in Backup & Restore feature.
 # '.kilo' is excluded as it contains local development tooling configurations.
 # '.env' is excluded for security reasons. You must create it manually on the target machine.
-$ExcludeFolders = @(".git", "node_modules", ".next", ".vscode", ".idea", ".kilo", "data", "backups", ".env")
+# 'devnotes' and files starting with 'old' are excluded as local development artifacts.
+$ExcludeFolders = @(".git", "node_modules", ".vscode", ".idea", ".kilo", "data", "backups", ".env", "deploy", "devnotes")
 
 Write-Host "==================================================" -ForegroundColor Cyan
 Write-Host "  Unified Chat Hub - Deployment Packager" -ForegroundColor Cyan
 Write-Host "==================================================" -ForegroundColor Cyan
 Write-Host "Source:      $SourcePath" -ForegroundColor Gray
 Write-Host "Destination: $DestinationPath" -ForegroundColor Gray
-Write-Host "Excluding:   $($ExcludeFolders -join ', ')" -ForegroundColor Yellow
+Write-Host "Excluding:   $($ExcludeFolders -join ', ') and files starting with 'old'" -ForegroundColor Yellow
 Write-Host "--------------------------------------------------" -ForegroundColor Gray
 
-# Get all items in the current directory, excluding the specified folders
+# Get all items in the current directory, excluding the specified folders and 'old*' files
 $ItemsToInclude = Get-ChildItem -Path $SourcePath -Force | Where-Object {
-    $ExcludeFolders -notcontains $_.Name
+    ($ExcludeFolders -notcontains $_.Name) -and ($_.Name -notlike 'old*')
 }
 
 try {

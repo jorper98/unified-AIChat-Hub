@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     
     return new Promise((resolve) => {
       const child = exec(`node "${scriptPath}"`, {
-        env: { ...process.env, UPDATE_ZIP_URL: updateUrl }
+        env: { ...process.env }
       });
 
       let output = '';

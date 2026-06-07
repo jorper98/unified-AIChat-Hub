@@ -82,7 +82,8 @@ export function AboutModal({
       if (response.ok) {
         setUpdateMessage('✅ Update applied successfully! Please restart the container to apply all changes.');
       } else {
-        setUpdateMessage(`❌ Update failed: ${data.error || 'Unknown error'}`);
+        const errorMsg = data.details ? `${data.error}\n\nDetails: ${data.details}` : (data.error || 'Unknown error');
+        setUpdateMessage(`❌ Update failed: ${errorMsg}`);
       }
     } catch (error) {
       setUpdateMessage('❌ Update failed: Network error.');
