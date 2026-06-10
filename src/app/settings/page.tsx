@@ -923,7 +923,14 @@ export default function SettingsPage() {
                     <div className="pt-2 border-t border-gray-800">
                       <h4 className="text-xs font-medium text-gray-400 mb-1">Preview of Injected Context:</h4>
                       <p className="text-xs text-gray-300 font-mono">
-                        Current date and time: {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: timezone || 'UTC' })} at {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: timezone || 'UTC' })}
+                        {(() => {
+                          try {
+                            const validTz = timezone && Intl.supportedValuesOf('timeZone').includes(timezone) ? timezone : 'UTC';
+                            return `Current date and time: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: validTz })} at ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: validTz })}`;
+                          } catch {
+                            return `Current date and time: Invalid timezone specified. Defaulting to UTC.`;
+                          }
+                        })()}
                       </p>
                       {weatherLocation && (
                         <p className="text-xs text-gray-300 font-mono mt-1">
