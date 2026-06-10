@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.8
+- Fixed frontend state desync: UI model dropdown now correctly syncs with the thread's saved `currentModel` upon loading.
+- Added `identity_query` router classification to prevent context priming. Standalone identity questions (e.g., "Who are you?") now automatically strip conversation history before sending to the model.
+- Injected `modelUsed` metadata into assistant message history, enabling the LLM to accurately read and report which models were used in a thread.
+- Refined router logic with strict negative constraints to prevent false positives (e.g., misclassifying history questions as image generation or identity queries).
+- Fixed `RangeError` crash in Settings page preview when typing incomplete/invalid timezones by adding safe validation fallback.
+- Bumped version to 0.3.8.
+
 ## v0.3.7
 - Fixed backup/restore: corrected collection name mismatch to ensure saved system prompts (multiple system instructions) are properly exported and imported.
 - Bumped version to 0.3.7.

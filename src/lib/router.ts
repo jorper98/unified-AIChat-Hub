@@ -3,7 +3,7 @@ import { queryPerplexity } from './perplexity';
 import { MODEL_PRICING } from './tokens';
 
 export interface RouterResult {
-  route: 'web_search' | 'direct_reply' | 'image_generation';
+  route: 'web_search' | 'direct_reply' | 'image_generation' | 'identity_query';
   searchQuery?: string;
   imagePrompt?: string;
   format?: 'full_answer' | 'snippets';
@@ -15,7 +15,8 @@ export interface RouterResult {
 const ROUTER_SYSTEM_PROMPT = `You are an intent classification router for a chatbot. Analyze the user's latest message and classify it into exactly one route:
 
 - "web_search": The user is asking about real-time information, current events, news, live data, recent updates, time-sensitive facts, sports scores, stock prices, weather forecasts, or anything requiring current web knowledge beyond a static knowledge cutoff. ALSO route here when the user asks about familiarity with a person, place, concept, or topic (e.g., "are you familiar with...", "do you know about...", "have you heard of...") since these often require verifying current information.
-- "image_generation": The user is requesting, asking for, or describing an image to be generated. This includes requests like "draw me...", "create an image of...", "generate a picture of...", "show me a photo of...", etc.
+- "image_generation": The user is requesting, asking for, or describing an image to be generated. This includes requests like "draw me...", "create an image of...", "generate a picture of...", "show me a photo of...", etc. DO NOT classify questions about conversation history, model switching, or general inquiries as image generation, even if they contain the word "model" or "image" in a non-visual context.
+- "identity_query": The user is asking strictly about the AI's own identity, name, underlying model, or creator (e.g., "who are you?", "what model are you?", "who made you?"). DO NOT classify questions about conversation history, model switching history, previous topics, or summaries (e.g., "what have we talked about?", "how many times did we switch models?", "summarize our chat") as identity queries; those must be "direct_reply".
 - "direct_reply": The user is asking about general knowledge, creative writing, code help, analysis, opinions, math, logic, conversation, greetings, or anything that can be answered without live web data.
 
 When classifying as "web_search", also:
@@ -38,7 +39,7 @@ const ROUTER_JSON_SCHEMA = {
   properties: {
     route: {
       type: 'string' as const,
-      enum: ['web_search', 'direct_reply', 'image_generation'],
+      enum: ['web_search', 'direct_reply', 'image_generation', 'identity_query'],
     },
     searchQuery: {
       type: 'string' as const,
@@ -153,17 +154,12 @@ export async function classifyIntent(
       console.error('[Router] Raw content snippet:', cleanContent.substring(0, 600));
       
       // Fallback: try to salvage image generation intent via regex if JSON is malformed or truncated
-      if (cleanContent.toLowerCase().includes('image_generation') || cleanContent.toLowerCase().includes('image')) {
-        // Match "imagePrompt": "anything, even if the string is truncated and lacks a closing quote
-        const imagePromptMatch = cleanContent.match(/"imagePrompt"\s*:\s*"(.*)/);
+      // Only trigger if explicitly mentioning 'image_generation' to avoid false positives from words like "no image requested"
+      if (cleanContent.toLowerCase().includes('image_generation')) {
+        const imagePromptMatch = cleanContent.match(/"imagePrompt"\s*:\s*"([^"]*)"/);
         if (imagePromptMatch) {
-          let prompt = imagePromptMatch[1].trim();
-          // Clean up trailing commas or quotes if partially matched
-          if (prompt.endsWith(',')) prompt = prompt.slice(0, -1);
-          if (prompt.endsWith('"')) prompt = prompt.slice(0, -1);
-          
-          result = { route: 'image_generation', imagePrompt: prompt, searchQuery: '', format: 'full_answer' };
-          console.log('[Router] Fallback: extracted imagePrompt via regex (possibly truncated)');
+          result = { route: 'image_generation', imagePrompt: imagePromptMatch[1], searchQuery: '', format: 'full_answer' };
+          console.log('[Router] Fallback: extracted imagePrompt via regex');
         } else {
           result = { route: 'direct_reply', searchQuery: '', imagePrompt: '', format: 'full_answer' };
         }
@@ -172,7 +168,7 @@ export async function classifyIntent(
       }
     }
 
-    if (result.route !== 'web_search' && result.route !== 'direct_reply' && result.route !== 'image_generation') {
+    if (result.route !== 'web_search' && result.route !== 'direct_reply' && result.route !== 'image_generation' && result.route !== 'identity_query') {
       console.log(`[Router] Invalid route "${result.route}", defaulting to direct_reply`);
       return { route: 'direct_reply', promptTokens, completionTokens, cost };
     }

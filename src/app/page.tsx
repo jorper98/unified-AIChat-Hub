@@ -271,6 +271,9 @@ export default function UnifiedChatInterface() {
         }
         if (data.thread) {
           setThreadMetadata(data.thread);
+          if (data.thread.currentModel) {
+            setModel(data.thread.currentModel);
+          }
           if (data.thread.systemInstruction) {
             setSystemPrompt(data.thread.systemInstruction);
           }
