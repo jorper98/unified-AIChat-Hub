@@ -112,9 +112,17 @@ try {
                 $ReleaseTitle = "Release v$Version"
                 $ReleaseNotes = "Deployment package for Unified Chat Hub v$Version"
                 
+                # Check if release already exists and delete it to allow override
+                $ExistingRelease = gh release view $ReleaseTag --json tagName -q '.tagName' 2>$null
+                if ($ExistingRelease -eq $ReleaseTag) {
+                    Write-Host "  Release '$ReleaseTag' already exists. Deleting to allow override..." -ForegroundColor Yellow
+                    gh release delete $ReleaseTag --yes
+                    Write-Host "  Existing release deleted successfully." -ForegroundColor Green
+                }
+
                 Write-Host "Creating release '$ReleaseTag' in repository '$RepoInfo'..." -ForegroundColor Gray
                 
-                # Create the release (will fail gracefully if it already exists, or we can add --latest)
+                # Create the new release
                 gh release create $ReleaseTag --title $ReleaseTitle --notes $ReleaseNotes --latest
                 
                 Write-Host "Uploading archive to release..." -ForegroundColor Gray

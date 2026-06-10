@@ -98,6 +98,12 @@ async function runUpdate() {
     console.log('[OTA Update] Running npm install to sync dependencies...');
     execSync('npm install', { cwd: appDir, stdio: 'inherit' });
     
+    console.log('[OTA Update] Clearing Next.js build cache to prevent stale module resolution...');
+    const nextCachePath = path.join(appDir, '.next');
+    if (fs.existsSync(nextCachePath)) {
+      fs.rmSync(nextCachePath, { recursive: true, force: true });
+    }
+    
     console.log('[OTA Update] Building application for production...');
     execSync('npm run build', { cwd: appDir, stdio: 'inherit' });
     
