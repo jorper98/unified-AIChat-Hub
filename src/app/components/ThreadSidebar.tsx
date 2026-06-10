@@ -1,5 +1,6 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ThreadSummary } from '@/types';
 import { formatDate } from '@/lib/utils';
@@ -67,6 +68,35 @@ export function ThreadSidebar({
   setShowGlobalCost,
   setShowImageGallery,
 }: ThreadSidebarProps) {
+  const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
+
+  useEffect(() => {
+    fetch('https://api.github.com/repos/jorper98/unified-AIChat-Hub/releases/latest', {
+      headers: { 'User-Agent': 'Unified-Chat-Hub-Updater' }
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && data.tag_name) {
+          const latestVersion = data.tag_name.replace(/^v/, '');
+          const currentParts = APP_VERSION.split('.').map(Number);
+          const latestParts = latestVersion.split('.').map(Number);
+          let isAvailable = false;
+          for (let i = 0; i < Math.max(currentParts.length, latestParts.length); i++) {
+            const curr = currentParts[i] || 0;
+            const lat = latestParts[i] || 0;
+            if (lat > curr) {
+              isAvailable = true;
+              break;
+            } else if (lat < curr) {
+              break;
+            }
+          }
+          setIsUpdateAvailable(isAvailable);
+        }
+      })
+      .catch(() => {});
+  }, [APP_VERSION]);
+
   return (
     <section className={`w-80 p-4 flex flex-col gap-4 border-r h-full pb-8 ${isDark ? 'bg-gray-950 border-gray-800' : 'bg-white border-gray-200'}`}>
       <div className="flex flex-col gap-1 mb-2">
@@ -75,10 +105,16 @@ export function ThreadSidebar({
           <span className={`text-[9px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>v{APP_VERSION}</span>
         </div>
         <div className="flex justify-end items-center gap-1">
-          <button onClick={() => setShowAbout(true)} className={`p-1.5 rounded transition ${isDark ? 'text-gray-500 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'}`} title="About">
+          <button onClick={() => setShowAbout(true)} className={`relative p-1.5 rounded transition ${isUpdateAvailable ? 'text-red-500 hover:text-red-400 hover:bg-red-900/20' : (isDark ? 'text-gray-500 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200')}`} title={isUpdateAvailable ? 'Update Available' : 'About'}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
+            {isUpdateAvailable && (
+              <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+              </span>
+            )}
           </button>
           <button onClick={toggleTheme} className={`p-1.5 rounded transition ${isDark ? 'text-gray-500 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'}`} title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
             {isDark ? (
