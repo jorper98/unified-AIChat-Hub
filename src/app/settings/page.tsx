@@ -366,7 +366,7 @@ export default function SettingsPage() {
           let url = provider.endpoint;
           if (provider.id === 'ollama') {
             url = provider.endpoint.replace('/api/chat', '/api/tags');
-          } else if (provider.id === 'llm-studio' || provider.id === 'openai-local') {
+          } else if (provider.endpoint.includes('/v1/chat/completions')) {
             url = provider.endpoint.replace('/v1/chat/completions', '/v1/models');
           }
           const res = await fetch(url);

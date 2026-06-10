@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.12
+- Fixed local model response parsing to support OpenAI-compatible formats (e.g., FastFlowLM, LM Studio) alongside Ollama formats.
+- Bumped version to 0.3.12.
+
 ## v0.3.11
 - Added red Info Sign (i) indicator in the sidebar when an update is available.
 - Replaced native alert with a dedicated Update Modal showing current version, new version, changelog, and an apply button.
