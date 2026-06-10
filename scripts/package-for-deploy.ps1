@@ -45,6 +45,29 @@ $ItemsToInclude = Get-ChildItem -Path $SourcePath -Force | Where-Object {
     ($ExcludeFolders -notcontains $_.Name) -and ($_.Name -notlike 'old*')
 }
 
+# --- PRE-RELEASE BUILD CHECK ---
+if ($Release) {
+    Write-Host ""
+    Write-Host "  Initiating Pre-Release Build Check..." -ForegroundColor Cyan
+    Write-Host "--------------------------------------------------" -ForegroundColor Gray
+    
+    Write-Host "  Step 1: Installing dependencies (npm install)..." -ForegroundColor Cyan
+    npm install
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: 'npm install' failed. Aborting release." -ForegroundColor Red
+        exit 1
+    }
+
+    Write-Host "  Step 2: Compiling application (npm run build)..." -ForegroundColor Cyan
+    npm run build
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: 'npm run build' failed. Aborting release due to compilation errors." -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "  Build successful. Proceeding with packaging..." -ForegroundColor Green
+    Write-Host "--------------------------------------------------" -ForegroundColor Gray
+}
+
 try {
     Write-Host "Compressing files... (this may take a moment)" -ForegroundColor Cyan
     
@@ -62,10 +85,14 @@ try {
     Write-Host "File size: $([math]::Round($FileSize, 2)) MB" -ForegroundColor Gray
     Write-Host ""
     Write-Host "NEXT STEPS:" -ForegroundColor Yellow
-    Write-Host "1. Transfer this .zip file to your target computer."
-    Write-Host "2. Extract it on the target computer."
-    Write-Host "3. Ensure the .env file contains your OPENROUTER_API_KEY."
-    Write-Host "4. Run: docker-compose -f docker-compose.prod.yml up -d --build"
+    if ($Release) {
+        Write-Host "Proceeding to GitHub Release..." -ForegroundColor Cyan
+    } else {
+        Write-Host "1. Transfer this .zip file to your target computer."
+        Write-Host "2. Extract it on the target computer."
+        Write-Host "3. Ensure the .env file contains your OPENROUTER_API_KEY."
+        Write-Host "4. Run: docker-compose -f docker-compose.prod.yml up -d --build"
+    }
     Write-Host "==================================================" -ForegroundColor Green
 
     # --- AUTOMATED GITHUB RELEASE ---
@@ -73,7 +100,7 @@ try {
         Write-Host ""
         Write-Host "  Initiating GitHub Release Process..." -ForegroundColor Cyan
         Write-Host "--------------------------------------------------" -ForegroundColor Gray
-        
+
         # Check if GitHub CLI is installed
         if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
             Write-Host "ERROR: GitHub CLI ('gh') is not installed or not in PATH." -ForegroundColor Red

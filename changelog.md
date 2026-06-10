@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.11
+- Added red Info Sign (i) indicator in the sidebar when an update is available.
+- Replaced native alert with a dedicated Update Modal showing current version, new version, changelog, and an apply button.
+- Updated deployment script to run `npm install` and `npm run build` before packaging when the `-Release` flag is used.
+- Bumped version to 0.3.11.
+
 ## v0.3.8
 - Fixed frontend state desync: UI model dropdown now correctly syncs with the thread's saved `currentModel` upon loading.
 - Added `identity_query` router classification to prevent context priming. Standalone identity questions (e.g., "Who are you?") now automatically strip conversation history before sending to the model.
