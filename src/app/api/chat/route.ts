@@ -255,11 +255,11 @@ export async function POST(request: Request) {
         if (completionData.error) {
           return NextResponse.json({ threadId: activeThreadId.toHexString(), response: `Ollama Error: ${completionData.error}` });
         }
-        aiTextOutput = completionData.message?.content || "No response from model.";
+        aiTextOutput = completionData.message?.content || completionData.choices?.[0]?.message?.content || completionData.response || "No response from model.";
         usage = {
-          promptTokens: completionData.prompt_eval_count || 0,
-          completionTokens: completionData.eval_count || 0,
-          totalTokens: (completionData.prompt_eval_count || 0) + (completionData.eval_count || 0)
+          promptTokens: completionData.prompt_eval_count || completionData.usage?.prompt_tokens || 0,
+          completionTokens: completionData.eval_count || completionData.usage?.completion_tokens || 0,
+          totalTokens: (completionData.prompt_eval_count || completionData.usage?.prompt_tokens || 0) + (completionData.eval_count || completionData.usage?.completion_tokens || 0)
         };
       } else {
         const headers: Record<string, string> = { "Content-Type": "application/json" };
