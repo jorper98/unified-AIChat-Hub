@@ -95,6 +95,12 @@ async function runUpdate() {
     console.log('[OTA Update] Copying files to /app...');
     copyDir(sourceDir, appDir);
     
+    console.log('[OTA Update] Clearing node_modules to ensure a clean dependency state...');
+    const nodeModulesPath = path.join(appDir, 'node_modules');
+    if (fs.existsSync(nodeModulesPath)) {
+      fs.rmSync(nodeModulesPath, { recursive: true, force: true });
+    }
+    
     console.log('[OTA Update] Running npm install to sync dependencies...');
     execSync('npm install', { cwd: appDir, stdio: 'inherit' });
     
