@@ -80,8 +80,11 @@ export function AboutModal({
       
       if (response.ok) {
         const logDetails = data.logs ? `\n\n--- Update Logs ---\n${data.logs}` : '';
-        setUpdateMessage(`✅ Update applied successfully!${logDetails}`);
+        setUpdateMessage(`✅ Update applied successfully! Reloading page...${logDetails}`);
         setShowUpdateModal(false);
+        setTimeout(() => {
+          window.location.reload();
+        }, 2500);
       } else {
         const errorMsg = data.details ? `${data.error}\n\nDetails: ${data.details}` : (data.error || 'Unknown error');
         setUpdateMessage(`❌ Update failed: ${errorMsg}`);
