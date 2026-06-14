@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.13
+- Fixed OTA update script to clear `node_modules` before `npm install`, preventing stale module resolution errors during updates.
+- Bumped version to 0.3.13.
+
 ## v0.3.12
 - Fixed local model response parsing to support OpenAI-compatible formats (e.g., FastFlowLM, LM Studio) alongside Ollama formats.
 - Bumped version to 0.3.12.
