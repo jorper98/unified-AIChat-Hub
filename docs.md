@@ -1,6 +1,6 @@
 # Unified Chat Hub - Complete Documentation
 
-**Version:** 0.3.13  
+**Version:** 0.3.14  
 **Copyright:** (c) 2026 Jorge Pereira (35sites.com LLC)  
 **Website:** https://35sites.com  
 **License:** MIT License
@@ -661,10 +661,10 @@ npm run start
    - Click "New Chat" or start typing in the input box
    - Thread is automatically named based on first message
 
-2. **Send Messages**
-   - Type your message in the input box
-   - Select AI model from dropdown
-   - Click "Dispatch" or press Enter
+ 2. **Send Messages**
+    - Type your message in the input box
+    - Select AI model from dropdown
+    - Click "Dispatch" to send (Press Enter to add a new line)
 
 3. **Switch Models Mid-Chat**
    - Use the model dropdown to change AI models

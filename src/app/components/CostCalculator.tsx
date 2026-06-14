@@ -195,7 +195,7 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="text-gray-600 hover:text-yellow-400 transition-colors text-[10px] px-1"
+        className="border px-1.5 py-0.5 rounded text-[9px] font-mono transition shrink-0 border-gray-700 text-gray-400 hover:text-yellow-400 hover:border-yellow-500/50"
         title="Cost Calculator"
       >
         $

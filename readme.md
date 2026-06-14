@@ -1,6 +1,6 @@
 # Unified Chat Hub
 
-## Version 0.3.13
+## Version 0.3.14
 
 ### About
 Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a unified interface for interacting with multiple LLM models within the same chat (Thread). You can search across all chats and track the tokens and costs of your interactions. It relies on OpenRouter, featuring an intelligent intent router that classifies queries and routes them to different tools or your directly selected LLM response.
@@ -163,6 +163,9 @@ docker compose up --build
 Once the build completes, open your browser to:
 http://localhost:3031
 
+Note: If you want to run the dev environment, use 
+npm run dev
+
 ---
 
 ### Maintenance & Infrastructure Controls
@@ -200,4 +203,3 @@ Repository: [https://github.com/jorper98/unified-AIChat-Hub](https://github.com/
 Copyright (c) 2026 Jorge Pereira (35sites.com LLC). Licensed under the MIT License.
 
 ---
-*Built with Next.js and powered by OpenRouter*
