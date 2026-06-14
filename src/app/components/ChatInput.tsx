@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, useEffect, useState } from 'react';
 import { DropdownModel, SavedPrompt, ChatTurn } from '@/types';
 import { CostCalculator } from './CostCalculator';
 import { formatTokenCount, MODEL_CONTEXT_LIMITS, MODEL_PRICING } from '@/lib/tokens';
@@ -69,16 +70,46 @@ export function ChatInput({
   setShowPromptModal,
   setShowRawData,
 }: ChatInputProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const sysInputRef = useRef<HTMLTextAreaElement>(null);
+  const [sysFocused, setSysFocused] = useState(false);
+
+  const autoGrow = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  };
+
+  useEffect(() => {
+    autoGrow(textareaRef.current);
+  }, [input]);
+
+  useEffect(() => {
+    if (sysFocused) autoGrow(sysInputRef.current);
+  }, [systemPrompt, sysFocused]);
+
+  const truncatedPrompt = systemPrompt.length > 100
+    ? systemPrompt.slice(0, 100) + '...'
+    : systemPrompt;
+
   return (
     <div className={`p-4 border-t ${isDark ? 'bg-gray-950/80 border-gray-800' : 'bg-white/80 border-gray-200'}`}>
       <div className="max-w-3xl mx-auto flex flex-col gap-3">
-        <div className={`flex items-center justify-between text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+        <div className={`flex items-center justify-between text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
           <span>Context: {formatTokenCount(totalTokens)} / {formatTokenCount(contextLimit)} ({usagePercent}%)</span>
-          <div className="flex gap-3">
+          <div className="flex items-center gap-3">
             <span>Input: ~{formatTokenCount(inputTokens)} ({inputLength} chars)</span>
-            <span>Thread: ~{formatTokenCount(threadTokens)} ({threadChars} chars, {messagesCount} msgs)
+            <span>Thread: ~{formatTokenCount(threadTokens)} ({threadChars} chars, {messagesCount} msgs)</span>
+            <div className="flex items-center gap-1">
               <CostCalculator messages={messages} />
-            </span>
+              <button
+                onClick={() => setShowRawData(true)}
+                className={`border px-1.5 py-0.5 rounded text-[9px] font-mono transition shrink-0 ${isDark ? 'border-gray-700 text-gray-400 hover:text-white hover:border-gray-500' : 'border-gray-300 text-gray-500 hover:text-gray-700 hover:border-gray-400'}`}
+                title="View raw thread data"
+              >
+                {'{ }'}
+              </button>
+            </div>
           </div>
         </div>
         <div className={`w-full rounded-full h-1 ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}>
@@ -88,37 +119,33 @@ export function ChatInput({
           />
         </div>
         <div className="flex gap-3 items-start">
-          <input
-            type="text"
+          <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.shiftKey || e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
             placeholder="Ask anything, switch models dynamically mid-chat..."
-            className="flex-1 bg-gray-900 border border-gray-700 rounded px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 text-gray-100"
+            rows={1}
+            className="flex-1 bg-gray-900 border border-gray-700 rounded px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 text-gray-100 resize-none overflow-y-auto min-h-[44px] transition-[height] duration-200"
           />
           <button
-            onClick={() => setShowRawData(true)}
-            className={`border px-3 py-3 rounded text-sm font-semibold transition shrink-0 ${isDark ? 'border-gray-700 text-gray-400 hover:text-white hover:border-gray-500' : 'border-gray-300 text-gray-500 hover:text-gray-700 hover:border-gray-400'}`}
-            title="View raw thread data"
+            type="button"
+            onClick={() => setBypassRouter(!bypassRouter)}
+            className={`rounded-md p-2.5 transition shrink-0 border cursor-pointer ${bypassRouter
+              ? 'border-indigo-500 bg-indigo-600 text-white shadow-[0_0_8px_rgba(99,102,241,0.4)]'
+              : 'border-gray-600 bg-gray-800 text-gray-500 hover:border-indigo-500 hover:text-indigo-400'
+            }`}
+            title={bypassRouter ? 'Router bypassed - sending directly to LLM' : 'Skip router, send directly to LLM'}
           >
-            {'{ }'}
+            <svg className="w-4 h-4 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
           </button>
-          <label className={`flex items-center gap-1.5 px-3 py-3 rounded border cursor-pointer shrink-0 transition ${bypassRouter ? (isDark ? 'border-indigo-500/50 bg-indigo-950/30 text-indigo-300' : 'border-indigo-400 bg-indigo-50 text-indigo-600') : (isDark ? 'border-gray-700 text-gray-400 hover:text-white hover:border-gray-500' : 'border-gray-300 text-gray-500 hover:text-gray-700 hover:border-gray-400')}`} title="Skip router, send directly to LLM">
-            <input
-              type="checkbox"
-              checked={bypassRouter}
-              onChange={(e) => setBypassRouter(e.target.checked)}
-              className="sr-only peer"
-            />
-            <div className={`w-4 h-4 rounded border flex items-center justify-center transition ${bypassRouter ? (isDark ? 'bg-indigo-600 border-indigo-500' : 'bg-indigo-500 border-indigo-400') : (isDark ? 'border-gray-600 bg-gray-800' : 'border-gray-300 bg-gray-100')}`}>
-              {bypassRouter && (
-                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-            </div>
-            <span className="text-xs font-semibold whitespace-nowrap">LLM Only</span>
-          </label>
           <button
             onClick={handleSend}
             disabled={loading}
@@ -162,7 +189,7 @@ export function ChatInput({
                   title="Save current prompt"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 inline mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 002-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                   </svg> Save
                 </button>
               </div>
@@ -180,13 +207,26 @@ export function ChatInput({
               </div>
             )}
             <div className="flex gap-1">
-              <textarea 
-                value={systemPrompt}
-                onChange={(e) => setSystemPrompt(e.target.value)}
-                rows={1}
-                className={`flex-1 border rounded px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500 resize-none ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-                placeholder="You are a helpful assistant."
-              />
+              {!sysFocused && systemPrompt ? (
+                <div
+                  onClick={() => setSysFocused(true)}
+                  className={`flex-1 border rounded px-2 py-1.5 text-xs truncate cursor-text ${isDark ? 'bg-gray-900 border-gray-700 text-gray-400' : 'bg-gray-100 border-gray-300 text-gray-600'} hover:border-indigo-500/50 transition-colors`}
+                  title="Click to edit system instructions"
+                >
+                  {truncatedPrompt}
+                </div>
+              ) : (
+                <textarea
+                  ref={sysInputRef}
+                  autoFocus={sysFocused}
+                  value={systemPrompt}
+                  onChange={(e) => setSystemPrompt(e.target.value)}
+                  onBlur={() => setSysFocused(false)}
+                  rows={1}
+                  className={`flex-1 border rounded px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500 resize-none overflow-y-auto min-h-[32px] transition-[height] duration-200 ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                  placeholder="You are a helpful assistant."
+                />
+              )}
               {savedPrompts.length > 0 && (
                 <button
                   onClick={() => setShowPromptModal(true)}

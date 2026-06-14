@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, useEffect } from 'react';
 import { SavedPrompt } from '@/types';
 
 interface PromptModalProps {
@@ -31,6 +32,15 @@ export function PromptModal({
   deletePrompt,
   setEditingPrompt,
 }: PromptModalProps) {
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = editTextareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, [editingPrompt?.content]);
+
   if (!isOpen) return null;
 
   return (
@@ -56,10 +66,11 @@ export function PromptModal({
                   placeholder="Prompt name"
                 />
                 <textarea
+                  ref={editTextareaRef}
                   value={editingPrompt.content}
                   onChange={(e) => setEditingPrompt({...editingPrompt, content: e.target.value})}
                   rows={3}
-                  className={`w-full border rounded px-2 py-1 text-xs mb-2 focus:outline-none focus:border-indigo-500 resize-none ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                  className={`w-full border rounded px-2 py-1 text-xs mb-2 focus:outline-none focus:border-indigo-500 resize-none overflow-y-auto min-h-[48px] transition-[height] duration-200 ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                   placeholder="System instructions..."
                 />
                 <div className="flex gap-1 justify-end">

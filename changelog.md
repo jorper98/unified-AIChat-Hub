@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.3.14
+- Chat input changed from single-line input to auto-expanding textarea: Enter inserts CRLF, message only sends via Dispatch button click
+- `{ }` Raw Data button moved to stats row next to `$` cost indicator, styled as compact bordered box
+- `{ }` and `$` buttons styled consistently with matching `text-[9px]` monospace font and border boxes
+- Stats row font increased from `10px` to `12px` for better readability
+- LLM Only (LLM Only/bypass router) reduced to compact toggle icon button with clear on/off visual states and hover feedback
+- Added MongoDB connection check with 3-second timeout and clear "DB server not found" error message in UI and console
+- System Instructions field shows first 100 characters as truncated preview; click to expand into an auto-growing textarea
+- System Instructions edit textarea in Load System Prompt modal now also auto-expands while typing
+- Bumped version to 0.3.14.
+
 ## v0.3.13
 - Fixed OTA update script to clear `node_modules` before `npm install`, preventing stale module resolution errors during updates.
 - Bumped version to 0.3.13.

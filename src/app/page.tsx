@@ -329,6 +329,10 @@ export default function UnifiedChatInterface() {
   const refreshPrompts = async () => {
     const res = await fetch('/api/prompts');
     const data = await res.json();
+    if (!res.ok) {
+      setErrorMessage(data.error || 'Failed to load prompts.');
+      return;
+    }
     if (data.prompts) setSavedPrompts(data.prompts);
   };
 
@@ -427,6 +431,10 @@ export default function UnifiedChatInterface() {
     try {
       const res = await fetch(`/api/threads?archived=true&limit=${threadsLimit}&skip=${skip}`);
       const data = await res.json();
+      if (!res.ok) {
+        setErrorMessage(data.error || 'Failed to load archived threads.');
+        return;
+      }
       if (data.threads) {
         if (isLoadMore) {
           setArchivedThreads(prev => [...prev, ...data.threads]);
@@ -522,6 +530,9 @@ export default function UnifiedChatInterface() {
       });
 
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send message.');
+      }
       if (data.threadId) {
         setThreadId(data.threadId);
         
@@ -564,9 +575,9 @@ export default function UnifiedChatInterface() {
         usage: data.usage
       }]);
 
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      setErrorMessage('Failed to send message.');
+      setErrorMessage(e.message || 'Failed to send message.');
     } finally {
       setLoading(false);
     }
