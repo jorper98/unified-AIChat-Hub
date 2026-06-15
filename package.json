@@ -1,6 +1,6 @@
 {
   "name": "unified-chat-hub",
-  "version": "0.3.15",
+  "version": "0.4.0",
   "private": true,
   "scripts": {
     "predev": "node -e \"console.log('\\nStarting Unified Chat Hub v' + require('./package.json').version + '\\n')\"",
@@ -15,9 +15,12 @@
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",
     "adm-zip": "^0.5.17",
+    "bcryptjs": "^3.0.3",
+    "jsonwebtoken": "^9.0.3",
     "jszip": "^3.10.1",
     "mongodb": "^6.5.0",
     "next": "^14.1.4",
+    "nodemailer": "^9.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^10.1.0",
@@ -26,7 +29,10 @@
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.11.30",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "^18.2.70",
     "@types/react-dom": "^18.2.22",
     "autoprefixer": "^10.4.19",

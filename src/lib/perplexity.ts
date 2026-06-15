@@ -88,8 +88,9 @@ export function isExitPerplexityMode(message: string): boolean {
 
 export async function queryPerplexityForSnippets(
   searchQuery: string,
+  providedApiKey?: string,
 ): Promise<{ snippets: string; citations: string[]; promptTokens: number; completionTokens: number; cost: number } | null> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = providedApiKey || process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     console.log('[Perplexity Snippets] OpenRouter API key not configured');
     return null;
@@ -152,7 +153,7 @@ Keep each snippet to 1-2 sentences. Include actual source URLs for citation.`,
     if (snippets) {
       // Replace [n] citation markers with markdown links if citations are available
       if (citations && citations.length > 0) {
-        snippets = snippets.replace(/\[(\d+)\]/g, (match, num) => {
+        snippets = snippets.replace(/\[(\d+)\]/g, (match: string, num: string) => {
           const idx = parseInt(num, 10) - 1;
           if (citations[idx]) {
             return `[${num}](${citations[idx]})`;
@@ -183,8 +184,12 @@ Keep each snippet to 1-2 sentences. Include actual source URLs for citation.`,
   }
 }
 
-export async function queryPerplexity(userQuery: string, conversationHistory: Array<{ role: string; content: string }> = []): Promise<{ answer: string; promptTokens: number; completionTokens: number; cost: number } | null> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+export async function queryPerplexity(
+  userQuery: string, 
+  conversationHistory: Array<{ role: string; content: string }> = [],
+  providedApiKey?: string
+): Promise<{ answer: string; promptTokens: number; completionTokens: number; cost: number } | null> {
+  const apiKey = providedApiKey || process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     console.log('[Perplexity] OpenRouter API key not configured');
     return null;
@@ -246,7 +251,7 @@ export async function queryPerplexity(userQuery: string, conversationHistory: Ar
     if (answer) {
       // Replace [n] citation markers with markdown links if citations are available
       if (citations && citations.length > 0) {
-        answer = answer.replace(/\[(\d+)\]/g, (match, num) => {
+        answer = answer.replace(/\[(\d+)\]/g, (match: string, num: string) => {
           const idx = parseInt(num, 10) - 1;
           if (citations[idx]) {
             return `[${num}](${citations[idx]})`;

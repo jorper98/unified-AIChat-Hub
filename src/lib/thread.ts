@@ -16,15 +16,18 @@ export async function createOrUpdateThread(
   threadId: string | null,
   threadName: string,
   selectedModel: string,
-  systemInstruction: string
+  systemInstruction: string,
+  userId: string
 ): Promise<ObjectId> {
   const db = await getDb();
   const activeThreadId = threadId ? new ObjectId(threadId) : new ObjectId();
   const isNewThread = !threadId;
+  const userIdObj = new ObjectId(userId);
 
   if (isNewThread) {
     await db.collection('threads').insertOne({
       _id: activeThreadId,
+      userId: userIdObj,
       name: threadName,
       currentModel: selectedModel,
       systemInstruction: systemInstruction || "You are a helpful assistant.",
@@ -33,7 +36,7 @@ export async function createOrUpdateThread(
     });
   } else {
     await db.collection('threads').updateOne(
-      { _id: activeThreadId },
+      { _id: activeThreadId, userId: userIdObj },
       { $set: { currentModel: selectedModel, systemInstruction: systemInstruction || "You are a helpful assistant.", updatedAt: new Date() } }
     );
   }
@@ -41,20 +44,21 @@ export async function createOrUpdateThread(
   return activeThreadId;
 }
 
-export async function saveUserMessage(threadId: ObjectId, content: string) {
+export async function saveUserMessage(threadId: ObjectId, content: string, userId: string) {
   const db = await getDb();
   await db.collection('messages').insertOne({
     threadId,
+    userId: new ObjectId(userId),
     role: 'user',
     content,
     createdAt: new Date()
   });
 }
 
-export async function getThreadHistory(threadId: ObjectId) {
+export async function getThreadHistory(threadId: ObjectId, userId: string) {
   const db = await getDb();
   return await db.collection('messages')
-    .find({ threadId })
+    .find({ threadId, userId: new ObjectId(userId) })
     .sort({ createdAt: 1 })
     .toArray();
 }

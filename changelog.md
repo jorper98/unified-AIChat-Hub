@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.4.0
+- Added full authentication system with user registration, email verification, secure login, and "remember me" for 24 hours.
+- Strict per-user data isolation: threads, messages, and settings are now isolated by user ID.
+- User-specific OpenRouter API key management with AES-256-GCM encryption at rest.
+- Added Admin user management interface to list and delete users.
+- Integrated NodeMailer with Gmail SMTP for email delivery and Cloudflare Turnstile support for anti-spam.
+- Created data migration script (`scripts/migrate-admin.ts`) to safely migrate existing global data to a default Admin user.
+- Bumped version to 0.4.0.
+
 ## v0.3.15
 - Enhanced OTA update script to perform a thorough cleanup (`package-lock.json` deletion, `npm cache clean --force`, and `node_modules/.cache` removal), ensuring pristine dependency resolution and preventing stale Webpack module errors during production updates.
 - Bumped version to 0.3.15.

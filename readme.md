@@ -1,9 +1,14 @@
 # Unified Chat Hub
 
-## Version 0.3.15
+## Version 0.4.0
 
 ### About
 Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a unified interface for interacting with multiple LLM models within the same chat (Thread). You can search across all chats and track the tokens and costs of your interactions. It relies on OpenRouter, featuring an intelligent intent router that classifies queries and routes them to different tools or your directly selected LLM response.
+
+---
+
+### 🔐 New: Multi-User Authentication
+This version introduces strict multi-user authentication. All access requires a valid, verified account. Each user has isolated data (threads, messages, settings) and manages their own encrypted OpenRouter API key. Existing data can be migrated to a default Admin account using the included migration script.
 
 ### Why Use This?
 - **Unified Workspace**: Tired of juggling different web and native OS applications? Keep everything in one simple, consolidated interface.
@@ -15,6 +20,10 @@ Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a un
 - **Transparent Cost Tracking**: Track token usage and costs per session, per model, and overall, so you always know exactly what you are spending.
 
 ### Features
+- **Strict Multi-User Authentication**: Secure registration, email verification, login with 24-hour "remember me", and clean logout flow.
+- **Per-User Data Isolation**: Threads, messages, settings, and prompts are strictly isolated by user ID. Users cannot see each other's data.
+- **Individual API Key Management**: Each user securely stores their own encrypted OpenRouter API key. Admins can optionally use a global fallback key.
+- **Admin User Management**: Dedicated admin dashboard to view users, force password resets, and delete accounts (with safe cascade deletion of their data).
 - **Multi-model support**: Via OpenRouter integration (GPT-4o, Claude, Gemini, DeepSeek, Qwen, MiniMax, Kimi, or any other available there).
 - **Custom providers**: Ability to use other providers including local models.
 - **Persistent context**: Maintained within the chat session (thread) while changing models.
@@ -39,6 +48,8 @@ Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a un
 - **Increased backup capacity**: Backup file size limit raised to 500MB for larger data exports.
 - **Over-The-Air (OTA) Updates**: Built-in update mechanism to download and apply new versions directly from a GitHub Release zip URL via the About modal, with automatic dependency syncing.
 - **Customizable theme colors**: Fully configurable dark and light mode colors including background, surface, text, accent, border, and secondary/tertiary backgrounds via the Settings UI.
+- **OpenRouter Model Browser**: Built-in UI in Settings to easily browse, search, and select from available OpenRouter models when adding or editing models.
+- **SMTP Email Testing**: Dedicated one-click test button in Settings to verify your email configuration before relying on it for user verification and password resets.
 
 ### Technical Stack
 - **Frontend**: Next.js 14.1.4, React 18.2.0, TypeScript 5.4.3
@@ -51,7 +62,7 @@ Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a un
 ---
 
 ### ⚠️ Security Notice
-**This application is designed for private, self-hosted environments.** It does not include built-in user authentication or access controls. It should **not** be exposed directly to the public internet without proper network-level security, such as a reverse proxy (e.g., Nginx, Traefik), a VPN, or a secure tunnel (e.g., Cloudflare Tunnel), along with appropriate firewall rules.
+**This application now includes robust, built-in multi-user authentication and strict data isolation.** It is designed to be secure, but should still be hosted in trusted environments with standard network-level security (e.g., reverse proxy, VPN, or Cloudflare Tunnel) and proper firewall rules.
 
 ---
 
@@ -72,7 +83,9 @@ unified-chat/
 ├── todo.md                           # Development task tracking
 ├── scripts/
 │   ├── package-for-deploy.ps1        # Secure deployment packaging script
-│   └── test-routing.ts               # CLI automated routing test script
+│   ├── test-routing.ts               # CLI automated routing test script
+│   ├── migrate-admin.ts              # Migrates existing global data to a default Admin user
+│   └── reset-admin.ts                # Resets or creates the default Admin account credentials
 └── src/
     ├── types.ts                      # Shared TypeScript interfaces
     ├── config/
@@ -110,7 +123,9 @@ unified-chat/
         │   ├── SettingsModal.tsx     # Settings viewer modal
         │   └── ThreadSidebar.tsx     # Thread history and search
         └── api/
-            ├── chat/route.ts         # Main chat routing endpoint + Perplexity fallback
+            ├── auth/                   # Authentication endpoints (register, verify, login, logout, me)
+            ├── admin/                  # Admin-only endpoints (user management, password resets)
+            ├── chat/route.ts           # Main chat routing endpoint + Perplexity fallback
             ├── logs/route.ts         # Server logs retrieval
             ├── prompts/route.ts      # Saved prompts CRUD
             ├── readme/route.ts       # README file retrieval
@@ -134,24 +149,40 @@ unified-chat/
 Create a `.env` file in the project root:
 
 ```env
-OPENROUTER_API_KEY=sk-or-v1-your_actual_token_string_here
-MONGODB_URI=mongodb://mongo_db:27017/chathub
+OPENROUTER_API_KEY=sk-or-v1-your_actual_token_string_here # Optional: Fallback if user doesn't set their own
+MONGODB_URI=mongodb://localhost:27017/chathub
+
+# Authentication & Security
+JWT_SECRET=your-super-secret-jwt-key-change-in-production
+ENCRYPTION_KEY=exactly-32-bytes-long-key-required!!
+
+# Email Configuration (Gmail SMTP)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_gmail_app_password
+SMTP_FROM="Unified Chat Hub" <no-reply@unifiedchat.com>
 
 # Public URL of the application (used for OpenRouter rate-limit attribution and absolute URLs)
-# Update the port if you change the docker-compose port mapping (default is 3031)
 NEXT_PUBLIC_APP_URL=http://localhost:3031
 
-# Host port for running tests from the host machine (matches the left side of docker-compose port mapping)
+# Host port for running tests from the host machine
 HOST_PORT=3031
 
 # Timezone for date/time display (IANA format)
 TIMEZONE=America/Phoenix
 
-# Location for weather injection (city name, zip code, or coordinates)
-# Leave empty to disable weather. You can ask about any location: "weather in Paris"
+# Location for weather injection
 WEATHER_LOCATION=Phoenix, AZ
 ```
-*Note: Perplexity Sonar uses your existing `OPENROUTER_API_KEY` with the model `perplexity/sonar`. No separate API key is required.*
+*Note: Perplexity Sonar uses your existing `OPENROUTER_API_KEY` with the model `perplexity/sonar`. Users can also configure their personal API key in Settings.*
+
+#### 1.5. Migrate Existing Data (Optional)
+If you have existing data in your database, run the migration script to assign it to a default Admin user:
+```powershell
+npx tsx scripts/migrate-admin.ts
+```
+This creates an Admin account (email: `admin@localhost`, password: `admin123456`) and reassigns all global threads, messages, and settings to this user. Change the admin credentials in the script or via environment variables (`ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`) before running.
 
 #### 2. Build and Start the Stack
 From the root `unified-chat` directory, run:
