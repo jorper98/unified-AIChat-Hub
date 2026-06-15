@@ -7,7 +7,7 @@ RUN npm install
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV ENCRYPTION_KEY=dummy-key-for-build-only
+ENV ENCRYPTION_KEY=0123456789abcdef0123456789abcdef
 RUN npm run build
 
 FROM node:20-alpine AS runner
