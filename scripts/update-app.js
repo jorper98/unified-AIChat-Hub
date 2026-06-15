@@ -101,6 +101,16 @@ async function runUpdate() {
       fs.rmSync(nodeModulesPath, { recursive: true, force: true });
     }
     
+    // Remove package-lock.json to prevent version mismatch resolution issues
+    const lockFilePath = path.join(appDir, 'package-lock.json');
+    if (fs.existsSync(lockFilePath)) {
+      fs.unlinkSync(lockFilePath);
+      console.log('[OTA Update] Removed package-lock.json to ensure fresh dependency resolution.');
+    }
+
+    console.log('[OTA Update] Clearing npm cache to prevent stale tarball issues...');
+    execSync('npm cache clean --force', { cwd: appDir, stdio: 'inherit' });
+    
     console.log('[OTA Update] Running npm install to sync dependencies...');
     execSync('npm install', { cwd: appDir, stdio: 'inherit' });
     
@@ -108,6 +118,12 @@ async function runUpdate() {
     const nextCachePath = path.join(appDir, '.next');
     if (fs.existsSync(nextCachePath)) {
       fs.rmSync(nextCachePath, { recursive: true, force: true });
+    }
+    
+    // Also clear node_modules/.cache just in case
+    const npmCachePath = path.join(appDir, 'node_modules', '.cache');
+    if (fs.existsSync(npmCachePath)) {
+      fs.rmSync(npmCachePath, { recursive: true, force: true });
     }
     
     console.log('[OTA Update] Building application for production...');

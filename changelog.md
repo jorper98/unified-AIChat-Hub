@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.15
+- Enhanced OTA update script to perform a thorough cleanup (`package-lock.json` deletion, `npm cache clean --force`, and `node_modules/.cache` removal), ensuring pristine dependency resolution and preventing stale Webpack module errors during production updates.
+- Bumped version to 0.3.15.
+
 ## v0.3.14
 - Chat input changed from single-line input to auto-expanding textarea: Enter inserts CRLF, message only sends via Dispatch button click
 - `{ }` Raw Data button moved to stats row next to `$` cost indicator, styled as compact bordered box

@@ -1,6 +1,6 @@
 # Unified Chat Hub - Complete Documentation
 
-**Version:** 0.3.14  
+**Version:** 0.3.15  
 **Copyright:** (c) 2026 Jorge Pereira (35sites.com LLC)  
 **Website:** https://35sites.com  
 **License:** MIT License
