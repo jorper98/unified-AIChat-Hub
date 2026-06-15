@@ -23,10 +23,7 @@ export function AboutModal({
   setShowReadme,
   setShowSettingsModal,
 }: AboutModalProps) {
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
-  const [changelog, setChangelog] = useState<string>('');
   const [isCheckingVersion, setIsCheckingVersion] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
 
@@ -40,7 +37,6 @@ export function AboutModal({
         .then(data => {
           if (data && data.tag_name) {
             setLatestVersion(data.tag_name.replace(/^v/, ''));
-            // Changelog is now fetched separately from changelog.md
           }
         })
         .catch(() => {
@@ -70,40 +66,7 @@ export function AboutModal({
     }
   }
 
-  const handleUpdate = async () => {
-    setIsUpdating(true);
-    setUpdateMessage('Checking for updates...');
-    
-    try {
-      const response = await fetch('/api/update', { method: 'POST' });
-      const data = await response.json();
-      
-      if (response.ok) {
-        const logDetails = data.logs ? `\n\n--- Update Logs ---\n${data.logs}` : '';
-        setUpdateMessage(`✅ Update applied successfully! Reloading page...${logDetails}`);
-        setShowUpdateModal(false);
-        setTimeout(() => {
-          window.location.reload();
-        }, 2500);
-      } else {
-        const errorMsg = data.details ? `${data.error}\n\nDetails: ${data.details}` : (data.error || 'Unknown error');
-        setUpdateMessage(`❌ Update failed: ${errorMsg}`);
-      }
-    } catch (error) {
-      setUpdateMessage('❌ Update failed: Network error.');
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const openUpdateModal = () => {
-    if (isUpdateAvailable) {
-      setShowUpdateModal(true);
-    }
-  };
-
   const getButtonState = () => {
-    if (isUpdating) return { text: '⏳ Updating...', disabled: true, className: 'opacity-50 cursor-not-allowed' };
     if (isCheckingVersion) return { text: '⏳ Checking...', disabled: true, className: 'opacity-50 cursor-not-allowed' };
     if (isUpdateAvailable) return { text: '🔄 Update Available', disabled: false, className: isDark ? 'border-indigo-600 text-indigo-400 hover:bg-indigo-900/30' : 'border-indigo-300 text-indigo-600 hover:bg-indigo-50' };
     return { text: '✅ Latest Release', disabled: true, className: 'opacity-50 cursor-not-allowed border-gray-600 text-gray-400' };
@@ -126,21 +89,16 @@ export function AboutModal({
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{aboutContent || 'Loading...'}</ReactMarkdown>
         </div>
         <div className={`p-4 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-          {updateMessage && (
-            <div className={`mb-3 p-2 rounded text-[10px] whitespace-pre-wrap ${updateMessage.includes('✅') ? (isDark ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700') : (isDark ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700')}`}>
-              {updateMessage}
-            </div>
-          )}
           <div className="flex items-center justify-between">
             <p className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-              By <a href="https://35sites.com/applications/unified-aichat-hub/" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300">Jorge Pereira (35sites.com LLC)</a>
+              By <a href="https://35sites.com/" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300">Jorge Pereira (35sites.com LLC)</a>
             </p>
             <div className="flex gap-2">
               <button
-                onClick={openUpdateModal}
-                disabled={buttonState.disabled}
+                onClick={() => setShowUpdateModal(true)}
+                disabled={buttonState.disabled || !isUpdateAvailable}
                 className={`text-[10px] px-2 py-1 rounded border transition flex items-center gap-1 ${buttonState.className}`}
-                title={buttonState.disabled ? 'You are on the latest version' : 'Check and Apply Updates'}
+                title={buttonState.disabled ? 'You are on the latest version' : 'View Update Instructions'}
               >
                 {buttonState.text}
               </button>
@@ -163,7 +121,7 @@ export function AboutModal({
         </div>
       </div>
 
-      {showUpdateModal && (
+      {showUpdateModal && isUpdateAvailable && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" onClick={() => setShowUpdateModal(false)}>
           <div className="absolute inset-0 bg-black/70" />
           <div className={`relative w-full max-w-md mx-4 rounded-lg border shadow-xl flex flex-col ${isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`} onClick={(e) => e.stopPropagation()}>
@@ -182,26 +140,20 @@ export function AboutModal({
                   <span className={`ml-2 font-mono font-semibold text-indigo-400`}>v{latestVersion}</span>
                 </div>
               </div>
-              <div className={`text-xs p-3 rounded border ${isDark ? 'bg-gray-800 border-gray-700 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-700'}`}>
-                <h4 className="font-semibold mb-2">Changelog:</h4>
-                <div className="prose prose-sm max-w-none prose-headings:text-xs prose-p:text-xs prose-ul:text-xs prose-strong:text-white">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{changelog}</ReactMarkdown>
-                </div>
+              <div className={`text-xs p-3 rounded border mb-3 ${isDark ? 'bg-gray-800 border-gray-700 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-700'}`}>
+                <p className="font-semibold mb-1">Deployment Instruction:</p>
+                <p>Updates are managed via Docker. Please run the following commands on your server:</p>
+                <pre className={`mt-2 p-2 rounded text-[10px] font-mono ${isDark ? 'bg-black/30 text-indigo-300' : 'bg-gray-200 text-gray-800'}`}>
+                  {`docker compose pull\ndocker compose up -d`}
+                </pre>
               </div>
             </div>
-            <div className={`p-4 border-t flex justify-end gap-2 ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+            <div className={`p-4 border-t flex justify-end ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
               <button
                 onClick={() => setShowUpdateModal(false)}
                 className={`text-xs px-3 py-1.5 rounded border transition ${isDark ? 'border-gray-600 text-gray-300 hover:bg-gray-800' : 'border-gray-300 text-gray-700 hover:bg-gray-100'}`}
               >
-                Cancel
-              </button>
-              <button
-                onClick={handleUpdate}
-                disabled={isUpdating}
-                className={`text-xs px-3 py-1.5 rounded border transition flex items-center gap-1 ${isUpdating ? 'opacity-50 cursor-not-allowed bg-indigo-600/50 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-500 border-indigo-600'}`}
-              >
-                {isUpdating ? '⏳ Updating...' : '🔄 Apply Update'}
+                Close
               </button>
             </div>
           </div>

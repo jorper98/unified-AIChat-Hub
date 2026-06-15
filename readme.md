@@ -1,6 +1,6 @@
 # Unified Chat Hub
 
-## Version 0.4.1
+## Version 0.4.2
 
 ### About
 Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a unified interface for interacting with multiple LLM models within the same chat (Thread). You can search across all chats and track the tokens and costs of your interactions. It relies on OpenRouter, featuring an intelligent intent router that classifies queries and routes them to different tools or your directly selected LLM response.
@@ -46,7 +46,7 @@ This version introduces strict multi-user authentication. All access requires a 
 - **Environment-aware configuration**: Dynamic URL and port handling for seamless local, Docker, and production deployments.
 - **Reliable image serving in production**: API-based image delivery bypasses static file caching for immediate display.
 - **Increased backup capacity**: Backup file size limit raised to 500MB for larger data exports.
-- **Over-The-Air (OTA) Updates**: Built-in update mechanism to download and apply new versions directly from a GitHub Release zip URL via the About modal, with automatic dependency syncing.
+- **Standardized Docker Image Deployment**: Automated build and push to container registry via GitHub Actions, ensuring zero-downtime, predictable, and immutable production updates.
 - **Customizable theme colors**: Fully configurable dark and light mode colors including background, surface, text, accent, border, and secondary/tertiary backgrounds via the Settings UI.
 - **OpenRouter Model Browser**: Built-in UI in Settings to easily browse, search, and select from available OpenRouter models when adding or editing models.
 - **SMTP Email Testing**: Dedicated one-click test button in Settings to verify your email configuration before relying on it for user verification and password resets.
