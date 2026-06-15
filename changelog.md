@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.4.2
+- Replaced Over-The-Air (OTA) in-app update mechanism with pre-built Docker image deployment workflow.
+- Migrated deployment process to GitHub Actions for automated build and push to GitHub Container Registry.
+- Restructured `package-for-deploy.ps1` to act as a release orchestrator (version bumping and git tagging).
+- Updated About modal to display Docker update instructions instead of in-app apply button.
+- Optimized Dockerfile to use multi-stage builds and Next.js `standalone` output, significantly reducing production image size by excluding dev dependencies, source code, and build artifacts.
+- Added `.dockerignore` to prevent unnecessary local files from bloating the Docker build context.
+- Bumped version to 0.4.2.
+
 ## v0.4.1
 - Security and other improvements.
 

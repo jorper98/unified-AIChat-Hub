@@ -1,0 +1,15 @@
+node_modules
+logs
+*.log
+.git
+.env
+dist
+build
+tmp
+.next
+coverage
+*.tsbuildinfo
+.github
+deploy
+docker-compose*.yml
+Dockerfile*

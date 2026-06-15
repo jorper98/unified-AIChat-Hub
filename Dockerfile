@@ -1,24 +1,43 @@
-FROM node:18-alpine
+# 1. Base Image
+FROM node:18-alpine AS base
 
-# Install curl and unzip for OTA update script
-RUN apk add --no-cache curl unzip
-
+# 2. Builder Stage
+FROM base AS builder
 WORKDIR /app
 
-# 1. Install dependencies
-COPY package.json ./
-RUN npm install
+# Copy package files first to leverage Docker layer caching
+COPY package.json package-lock.json* ./
+RUN npm ci
 
-# 2. Copy the rest of your code
+# Copy the rest of the source code
 COPY . .
 
-# 3. Build the Next.js application
+# Build the Next.js application
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-# 4. Expose and Bind to all incoming network traffic
+# 3. Runner Stage (Production)
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Create a non-root user for security
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Copy only the necessary production artifacts from the builder stage
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+USER nextjs
+
+# Expose the port
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["npm", "run", "start"]
+# Start the standalone Next.js server
+CMD ["node", "server.js"]

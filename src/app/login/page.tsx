@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import packageJson from '../../../package.json';
+
+const APP_VERSION = packageJson.version;
 
 export default function LoginPage() {
   const router = useRouter();
@@ -52,8 +55,8 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-900 p-4">
       <div className="w-full max-w-md rounded-xl bg-gray-800 p-8 shadow-xl">
-        <h1 className="mb-6 text-center text-2xl font-bold text-white">Unified Chat Hub</h1>
-        <p className="mb-6 text-center text-gray-400">v0.4.0</p>
+        <h1 className="mb-2 text-center text-2xl font-bold text-white">Unified Chat Hub</h1>
+        <p className="mb-6 text-center text-gray-400 text-sm">v{APP_VERSION}</p>
 
         {error && (
           <div className="mb-4 rounded bg-red-500/10 p-3 text-sm text-red-400 border border-red-500/20">
