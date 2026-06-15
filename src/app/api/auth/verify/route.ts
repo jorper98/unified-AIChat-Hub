@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     const token = searchParams.get('token');
 
     if (!token) {
-      return NextResponse.redirect(new URL('/login?error=missing_token', request.url));
+      return NextResponse.json({ error: 'missing_token' }, { status: 400 });
     }
 
     const db = await getDb();
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const user = await usersCollection.findOne({ emailVerificationToken: token });
 
     if (!user) {
-      return NextResponse.redirect(new URL('/login?error=invalid_token', request.url));
+      return NextResponse.json({ error: 'invalid_token' }, { status: 400 });
     }
 
     await usersCollection.updateOne(
@@ -26,9 +26,9 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    return NextResponse.redirect(new URL('/login?success=verified', request.url));
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Verification error:', error);
-    return NextResponse.redirect(new URL('/login?error=server_error', request.url));
+    return NextResponse.json({ error: 'server_error' }, { status: 500 });
   }
 }
