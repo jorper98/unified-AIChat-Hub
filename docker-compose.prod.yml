@@ -1,7 +1,7 @@
 services:
   # 1. Next.js Web App (Pre-built Docker Image)
   web-app:
-    image: ghcr.io/jorper98/unified-aichat-hub:v0.4.4
+    image: ghcr.io/jorper98/unified-aichat-hub:v0.4.5
     container_name: unified_chat_web
     ports:
       - "3031:3000"
