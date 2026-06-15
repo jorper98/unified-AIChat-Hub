@@ -5,8 +5,8 @@
 - Migrated deployment process to GitHub Actions for automated build and push to GitHub Container Registry.
 - Restructured `package-for-deploy.ps1` to act as a release orchestrator (version bumping and git tagging).
 - Updated About modal to display Docker update instructions instead of in-app apply button.
-- Optimized Dockerfile to use multi-stage builds and Next.js `standalone` output, significantly reducing production image size by excluding dev dependencies, source code, and build artifacts.
-- Added `.dockerignore` to prevent unnecessary local files from bloating the Docker build context.
+- Optimized Dockerfile to use multi-stage builds and Next.js `standalone` output, significantly reducing production image size by excluding dev dependencies, source code, and build artifacts. Switched to Node.js 20 Alpine base image.
+- Simplified GitHub Actions workflow to use raw Docker CLI for reliable builds and transparent error output.
 - Bumped version to 0.4.2.
 
 ## v0.4.1
