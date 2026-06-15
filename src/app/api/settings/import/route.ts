@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { verifyAuthToken } from '@/lib/auth';
 import { ObjectId } from 'mongodb';
 import AdmZip from 'adm-zip';
 import fs from 'fs';
@@ -7,8 +8,15 @@ import path from 'path';
 
 const MAX_BACKUP_FILE_SIZE = 500 * 1024 * 1024; // 500MB
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const token = request.cookies.get('auth_token')?.value;
+    const decoded = token ? verifyAuthToken(token) : null;
+
+    if (!decoded) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     const mode = (formData.get('mode') as string) || 'replace';
@@ -39,6 +47,7 @@ export async function POST(request: Request) {
     }
 
     const db = await getDb();
+    const currentUserId = new ObjectId(decoded.userId);
     const imagesDir = path.join(process.cwd(), 'public', 'images');
 
     // Helper to safely convert IDs: only valid 24-char hex strings become ObjectIds
@@ -57,20 +66,31 @@ export async function POST(request: Request) {
       let skipped = 0;
 
       if (mode === 'replace') {
-        await collection.deleteMany({});
+        // Only delete current user's data, not global data
+        await collection.deleteMany({ userId: currentUserId });
         for (const item of items) {
-          const doc = { ...item, _id: safeObjectId(item._id) };
+          // Force the userId to be the current authenticated user to prevent cross-user contamination
+          const doc = { 
+            ...item, 
+            _id: safeObjectId(item._id),
+            userId: currentUserId 
+          };
           if (doc.threadId) doc.threadId = safeObjectId(doc.threadId);
           await collection.insertOne(doc);
           inserted++;
         }
       } else {
         for (const item of items) {
-          const existing = await collection.findOne({ _id: safeObjectId(item._id) });
+          // In merge mode, only check against current user's existing data
+          const existing = await collection.findOne({ _id: safeObjectId(item._id), userId: currentUserId });
           if (existing) {
             skipped++;
           } else {
-            const doc = { ...item, _id: safeObjectId(item._id) };
+            const doc = { 
+              ...item, 
+              _id: safeObjectId(item._id),
+              userId: currentUserId
+            };
             if (doc.threadId) doc.threadId = safeObjectId(doc.threadId);
             await collection.insertOne(doc);
             inserted++;

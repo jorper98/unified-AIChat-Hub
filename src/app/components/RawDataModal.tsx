@@ -54,10 +54,34 @@ export function RawDataModal({ messages, threadId, threadMetadata, isOpen, onClo
   const jsonString = JSON.stringify(rawData, null, 2);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(jsonString).then(() => {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(jsonString).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }).catch(() => {
+        fallbackCopy(jsonString);
+      });
+    } else {
+      fallbackCopy(jsonString);
+    }
+  };
+
+  const fallbackCopy = (text: string) => {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-9999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      document.execCommand('copy');
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+    document.body.removeChild(textArea);
   };
 
   const totalTokens = messages.reduce((sum, m) => sum + (m.usage?.totalTokens || 0), 0);

@@ -35,6 +35,8 @@ interface ThreadSidebarProps {
   setShowAbout: (show: boolean) => void;
   setShowGlobalCost: (show: boolean) => void;
   setShowImageGallery: (show: boolean) => void;
+  user: any;
+  handleLogout: () => void;
 }
 
 export function ThreadSidebar({
@@ -67,6 +69,8 @@ export function ThreadSidebar({
   setShowAbout,
   setShowGlobalCost,
   setShowImageGallery,
+  user,
+  handleLogout,
 }: ThreadSidebarProps) {
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
 
@@ -163,6 +167,29 @@ export function ThreadSidebar({
       >
         + Start New Thread
       </button>
+
+      {user && (
+        <div className={`border rounded-lg p-2 flex items-center justify-between gap-2 ${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-gray-50 border-gray-200'}`}>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${isDark ? 'bg-indigo-900/50 text-indigo-300' : 'bg-indigo-100 text-indigo-700'}`}>
+              {user.name.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex flex-col overflow-hidden flex-1 min-w-0">
+              <span className={`text-xs font-medium truncate ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>{user.name}</span>
+              <span className={`text-[10px] truncate ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{user.email}</span>
+            </div>
+          </div>
+          <button
+            onClick={handleLogout}
+            className={`p-1.5 rounded border transition shrink-0 ${isDark ? 'text-red-400 border-red-800/50 hover:bg-red-900/30' : 'text-red-600 border-red-200 hover:bg-red-100'}`}
+            title="Log Out"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </button>
+        </div>
+      )}
       
       <hr className={isDark ? 'border-gray-800' : 'border-gray-200'} />
 

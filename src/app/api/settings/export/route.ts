@@ -1,21 +1,32 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { verifyAuthToken } from '@/lib/auth';
+import { ObjectId } from 'mongodb';
 import JSZip from 'jszip';
 import fs from 'fs';
 import path from 'path';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const db = await getDb();
+    const token = request.cookies.get('auth_token')?.value;
+    const decoded = token ? verifyAuthToken(token) : null;
 
-    const threads = await db.collection('threads').find({}).toArray();
-    const messages = await db.collection('messages').find({}).toArray();
-    const settings = await db.collection('settings').find({}).toArray();
-    const prompts = await db.collection('system_prompts').find({}).toArray();
+    if (!decoded) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
+    const db = await getDb();
+    const userId = new ObjectId(decoded.userId);
+
+    const threads = await db.collection('threads').find({ userId }).toArray();
+    const messages = await db.collection('messages').find({ userId }).toArray();
+    const settings = await db.collection('settings').find({ userId }).toArray();
+    const prompts = await db.collection('system_prompts').find({ userId }).toArray();
 
     const backup = {
-      version: '0.1.0',
+      version: '0.4.0',
       exportedAt: new Date().toISOString(),
+      userId: decoded.userId,
       collections: {
         threads: threads.map(t => ({ ...t, _id: t._id.toString() })),
         messages: messages.map(m => ({ ...m, _id: m._id.toString(), threadId: m.threadId.toString() })),

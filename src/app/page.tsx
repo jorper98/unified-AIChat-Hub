@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { CostCalculator } from './components/CostCalculator';
 import { RawDataModal } from './components/RawDataModal';
 import { ThreadSidebar } from './components/ThreadSidebar';
@@ -34,6 +35,7 @@ const MASTER_NAME_MAP: Record<string, string> = {
 };
 
 export default function UnifiedChatInterface() {
+  const router = useRouter();
   const [threadId, setThreadId] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('activeThreadId') || null;
@@ -81,7 +83,32 @@ export default function UnifiedChatInterface() {
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [bypassRouter, setBypassRouter] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  
+  const [user, setUser] = useState<any>(null);
+  const [showApiKeyWarning, setShowApiKeyWarning] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const saved = localStorage.getItem('theme') as 'dark' | 'light' | null;
+    if (saved) setTheme(saved);
+
+    fetch('/api/auth/me')
+      .then(res => {
+        if (res.status === 401) {
+          window.location.href = '/login';
+          return null;
+        }
+        return res.ok ? res.json() : null;
+      })
+      .then(data => {
+        if (data?.user) setUser(data.user);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleLogout = () => {
+    window.location.href = '/logout';
+  };
+
   const [threadsLimit, setThreadsLimit] = useState(25);
   const [threadsSkip, setThreadsSkip] = useState(0);
   const [hasMoreThreads, setHasMoreThreads] = useState(true);
@@ -508,6 +535,12 @@ export default function UnifiedChatInterface() {
   async function handleSend() {
     if (!input.trim() || loading || !model) return;
 
+    // Require API key for all users EXCEPT admin (who can fall back to global .env key)
+    if (!user?.openRouterApiKey && user?.role !== 'admin') {
+      setShowApiKeyWarning(true);
+      return;
+    }
+
     setLoading(true);
     const userText = input;
     setInput('');
@@ -530,8 +563,23 @@ export default function UnifiedChatInterface() {
       });
 
       const data = await res.json();
+      
+      // Catch backend returning 200 OK but with an API error string in the response
+      if (data.response && typeof data.response === 'string' && data.response.includes('API Error') && data.response.includes('Missing Authentication')) {
+        setShowApiKeyWarning(true);
+        setErrorMessage('API Key missing or invalid. Please configure it in Settings.');
+        setLoading(false);
+        return;
+      }
+
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to send message.');
+        if (data.code === 'MISSING_API_KEY' || res.status === 401) {
+          setShowApiKeyWarning(true);
+          setErrorMessage('API Key missing or invalid. Please configure it in Settings.');
+        } else {
+          throw new Error(data.error || 'Failed to send message.');
+        }
+        return;
       }
       if (data.threadId) {
         setThreadId(data.threadId);
@@ -615,6 +663,8 @@ export default function UnifiedChatInterface() {
         setShowAbout={setShowAbout}
         setShowGlobalCost={setShowGlobalCost}
         setShowImageGallery={setShowImageGallery}
+        user={user}
+        handleLogout={handleLogout}
       />
 
       <div className="flex-1 flex flex-col h-full pb-8">
@@ -753,6 +803,36 @@ export default function UnifiedChatInterface() {
         onClose={() => setShowImageGallery(false)}
         isDark={isDark}
       />
+
+      {showApiKeyWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className={`w-full max-w-md rounded-xl border p-6 shadow-2xl ${isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`}>
+            <div className="flex items-center gap-3 mb-4">
+              <svg className="h-8 w-8 text-yellow-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>API Key Required</h3>
+            </div>
+            <p className={`mb-6 text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+              Please setup your OpenRouter API key in the settings page before sending messages. Each user must provide their own API key to use the chat.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowApiKeyWarning(false)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${isDark ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => router.push('/settings')}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition"
+              >
+                Go to Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

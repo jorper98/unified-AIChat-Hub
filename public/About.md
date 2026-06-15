@@ -1,12 +1,18 @@
 # Unified Chat Hub
 
-## Version 0.3.15
+## Version 0.4.0
 
 ### About
-Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a unified interface for interacting with multiple LLM models within the same chat (Thread). You can search across all chats and track the tokens and costs of your interactions. It relies on OpenRouter, featuring an intelligent intent router that classifies queries and routes them to different tools or your directly selected LLM response.
+Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a unified interface for interacting with multiple LLM models within the same chat (Thread). You can search across all chats, track tokens and costs, and manage your interactions securely. It relies on OpenRouter, featuring an intelligent intent router that classifies queries and routes them to different tools or your directly selected LLM response. 
+
+**v0.4.0 introduces strict multi-user authentication, per-user data isolation, individual encrypted API key management, and comprehensive admin user controls.**
 
 ### Features
 
+- **Strict Multi-User Authentication**: Secure registration, email verification, login with 24-hour "remember me", and clean logout flow.
+- **Per-User Data Isolation**: Threads, messages, settings, and prompts are strictly isolated by user ID.
+- **Individual API Key Management**: Each user securely stores their own encrypted OpenRouter API key. Admins can optionally use a global fallback key.
+- **Admin User Management**: Dedicated admin dashboard to view users, force password resets, and delete accounts safely.
 - Multi-model support via OpenRouter integration (GPT-4o, Claude, Gemini, DeepSeek, Qwen, MiniMax, Kimi, or any other available there)
 - Ability to use other providers including local models.
 - Persistant Context within the chat session (thread) while changing models
@@ -29,6 +35,8 @@ Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a un
 - Reliable image serving in production: API-based image delivery bypasses static file caching
 - Over-The-Air (OTA) Updates: Built-in update mechanism to download and apply new versions directly from a GitHub Release zip URL via the About modal, with automatic dependency syncing and zero-config latest release detection.
 - Customizable theme colors: Fully configurable dark and light mode colors including background, surface, text, accent, border, and secondary/tertiary backgrounds via the Settings UI.
+- OpenRouter Model Browser: Built-in UI to easily browse, search, and select from available OpenRouter models when adding or editing.
+- SMTP Email Testing: Dedicated one-click test button in Settings to verify email configuration.
 
 ### Technical Stack
 - Frontend: Next.js 14.1.4, React 18.2.0, TypeScript 5.4.3
@@ -48,4 +56,4 @@ Repository: [https://github.com/jorper98/unified-AIChat-Hub](https://github.com/
 // Copyright (c) 2026 Jorge Pereira (35sites.com LLC). Licensed under the MIT License.
 
 ---
-*Built with Next.js and powered by OpenRouter*
+

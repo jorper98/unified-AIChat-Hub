@@ -1,7 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import modelConfig from '@/config/models.json';
 import { SettingsDocument } from '@/lib/types';
+import { ObjectId } from 'mongodb';
+import { verifyAuthToken } from '@/lib/auth';
 
 const DEFAULT_PROVIDERS = modelConfig.providers.map((p: any) => ({ id: p.id, name: p.name, type: p.type }));
 const DEFAULT_MODELS = modelConfig.selectedModels.map((id: string) => {
@@ -12,13 +14,19 @@ const DEFAULT_MODELS = modelConfig.selectedModels.map((id: string) => {
   return { id, name: id, provider: 'openrouter' };
 });
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const token = request.cookies.get('auth_token')?.value;
+    const decoded = token ? verifyAuthToken(token) : null;
+
+    if (!decoded) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
     const db = await getDb();
-    const settings = await db.collection<SettingsDocument>('settings').findOne({ _id: 'global_settings' });
+    const userId = new ObjectId(decoded.userId);
+    const settings = await db.collection<SettingsDocument>('settings').findOne({ userId });
     
-    // SECURITY: Explicitly return only safe, UI-necessary fields to prevent leaking 
-    // sensitive data like apiKeyEnv or other internal configuration.
     return NextResponse.json({
       models: settings?.models || DEFAULT_MODELS,
       providers: settings?.providers || DEFAULT_PROVIDERS,
@@ -35,8 +43,15 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const token = request.cookies.get('auth_token')?.value;
+    const decoded = token ? verifyAuthToken(token) : null;
+
+    if (!decoded) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
     const { models, providers, theme, themeColors, globalSystemPrompt, routerModel, imageGenerationModel, timezone, weatherLocation } = await request.json();
     const db = await getDb();
 
@@ -51,9 +66,11 @@ export async function POST(request: Request) {
     if (timezone !== undefined) updateData.timezone = timezone;
     if (weatherLocation !== undefined) updateData.weatherLocation = weatherLocation;
 
+    const userId = new ObjectId(decoded.userId);
+
     await db.collection('settings').updateOne(
-      { _id: 'global_settings' as any },
-      { $set: updateData },
+      { userId },
+      { $set: { ...updateData, userId } },
       { upsert: true }
     );
 

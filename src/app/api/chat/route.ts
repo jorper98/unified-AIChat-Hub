@@ -1,34 +1,67 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { buildSystemContext } from '@/lib/context';
 import { isUncertainResponse, isPerplexityRecheck, isExitPerplexityMode, queryPerplexity, queryPerplexityForSnippets } from '@/lib/perplexity';
 import { classifyIntent, RouterResult } from '@/lib/router';
 import { logToServer } from '@/lib/logger';
 import { SettingsDocument } from '@/lib/types';
 import { getProviderForModel } from '@/lib/model-providers';
-import { generateThreadName, createOrUpdateThread, saveUserMessage, getThreadHistory } from '@/lib/thread';
+import { createOrUpdateThread, saveUserMessage, getThreadHistory } from '@/lib/thread';
 import { extractAndSaveImages } from '@/lib/image-processing';
 import { parseModelResponse } from '@/lib/response-parser';
 import { getDb } from '@/lib/db';
+import { getCurrentUserId, getCurrentUserApiKey } from '@/lib/user';
+import { ObjectId } from 'mongodb';
 
 const MAX_WEB_SEARCH_CONTEXT_CHARS = 15000;
 const MAX_HISTORY_CHARS = 100000;
 const TRUNCATED_HISTORY_CHARS = 80000;
 const MIN_HISTORY_MESSAGES = 4;
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const userId = await getCurrentUserId(request);
+    if (!userId) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
+    const db = await getDb();
+    const userDoc = await db.collection('users').findOne({ _id: new ObjectId(userId) });
+    const isAdmin = userDoc?.role === 'admin';
+
+    // Enforce API key requirement for non-admin users
+    if (!isAdmin && !userDoc?.openRouterApiKey) {
+      return NextResponse.json({ 
+        error: 'Missing API Key. Please configure your OpenRouter API key in Settings.',
+        code: 'MISSING_API_KEY'
+      }, { status: 400 });
+    }
+
+    // Get API key: user's key, or fallback to env for admin
+    let apiKey: string | undefined = undefined;
+    if (userDoc?.openRouterApiKey) {
+      try {
+        const { decrypt } = await import('@/lib/encryption');
+        apiKey = decrypt(userDoc.openRouterApiKey);
+      } catch (error) {
+        console.error('Failed to decrypt user API key:', error);
+      }
+    }
+    if (!apiKey && isAdmin) {
+      apiKey = process.env.OPENROUTER_API_KEY;
+    }
+
     const { threadId, messageContent, selectedModel, systemInstruction, promptName, bypassRouter, threadName: requestedThreadName } = await request.json();
     console.log(`[Chat] bypassRouter=${bypassRouter}, message="${messageContent.substring(0, 50)}..."`);
     logToServer(`POST /api/chat model=${selectedModel} bypassRouter=${bypassRouter}, message="${messageContent.substring(0, 80)}..."`);
 
-    const db = await getDb();
-    const settings = await db.collection<SettingsDocument>('settings').findOne({ _id: 'global_settings' });
+    const settings = await db.collection<SettingsDocument>('settings').findOne({ userId: new ObjectId(userId) });
 
+    const { generateThreadName } = await import('@/lib/thread');
     const threadName = requestedThreadName || generateThreadName(messageContent);
-    const activeThreadId = await createOrUpdateThread(threadId, threadName, selectedModel, systemInstruction);
-    await saveUserMessage(activeThreadId, messageContent);
+    const activeThreadId = await createOrUpdateThread(threadId, threadName, selectedModel, systemInstruction, userId);
+    await saveUserMessage(activeThreadId, messageContent, userId);
 
-    const rawHistory = await getThreadHistory(activeThreadId);
+    const rawHistory = await getThreadHistory(activeThreadId, userId);
     let formattedHistory = rawHistory.map(msg => {
       // Inject model metadata into assistant messages so the LLM knows which model generated which response
       if (msg.role === 'assistant' && msg.modelUsed) {
@@ -140,7 +173,7 @@ export async function POST(request: Request) {
         logToServer(`Router web_search model=${selectedModel}: "${routerResult.searchQuery}" (format: ${routerResult.format})`, 'info');
 
         if (routerResult.format === 'full_answer') {
-          const perplexityResult = await queryPerplexity(routerResult.searchQuery, historyForRouter);
+          const perplexityResult = await queryPerplexity(routerResult.searchQuery, historyForRouter, apiKey);
           if (perplexityResult) {
             webSearchContext = `<web_search_context>\n<answer>${perplexityResult.answer}</answer>\n</web_search_context>`;
             perplexityUsage = {
@@ -151,7 +184,7 @@ export async function POST(request: Request) {
             };
           }
         } else if (routerResult.format === 'snippets') {
-          const snippetsResult = await queryPerplexityForSnippets(routerResult.searchQuery);
+          const snippetsResult = await queryPerplexityForSnippets(routerResult.searchQuery, apiKey);
           if (snippetsResult) {
             const snippetLines = snippetsResult.snippets.split('\n').map((line, idx) => {
               if (line.trim().match(/^\d+\./)) return `<snippet number="${idx + 1}">${line}</snippet>`;
@@ -199,7 +232,7 @@ export async function POST(request: Request) {
       const perplexityHistory = rawHistory
         .filter(msg => msg.role === 'user' || msg.role === 'assistant')
         .map(msg => ({ role: msg.role, content: msg.content }));
-      const perplexityResult = await queryPerplexity(messageContent, perplexityHistory);
+      const perplexityResult = await queryPerplexity(messageContent, perplexityHistory, apiKey);
       if (perplexityResult) {
         aiTextOutput = perplexityResult.answer;
         perplexityUsage = {
@@ -218,7 +251,7 @@ export async function POST(request: Request) {
 
       if (previousUserMessage) {
         console.log(`[Perplexity Recheck] Running previous question through Perplexity: "${previousUserMessage.content.substring(0, 50)}..."`);
-        const perplexityResult = await queryPerplexity(previousUserMessage.content);
+        const perplexityResult = await queryPerplexity(previousUserMessage.content, [], apiKey);
         if (perplexityResult) {
           aiTextOutput = perplexityResult.answer;
           perplexityUsage = {
@@ -261,10 +294,18 @@ export async function POST(request: Request) {
           completionTokens: completionData.eval_count || completionData.usage?.completion_tokens || 0,
           totalTokens: (completionData.prompt_eval_count || completionData.usage?.prompt_tokens || 0) + (completionData.eval_count || completionData.usage?.completion_tokens || 0)
         };
-      } else {
+        } else {
+        const requiresApiKey = provider.type !== 'local' && provider.id !== 'ollama';
+        if (requiresApiKey && !apiKey) {
+          return NextResponse.json({
+            error: 'API Key is missing. Please configure your OpenRouter API key in Settings or in your .env file.',
+            code: 'MISSING_API_KEY'
+          }, { status: 400 });
+        }
+
         const headers: Record<string, string> = { "Content-Type": "application/json" };
-        if (provider.apiKeyEnv && process.env[provider.apiKeyEnv]) {
-          headers["Authorization"] = `Bearer ${process.env[provider.apiKeyEnv]}`;
+        if (apiKey) {
+          headers["Authorization"] = `Bearer ${apiKey}`;
         }
         if (provider.id === 'openrouter') {
           headers["HTTP-Referer"] = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3031";
@@ -306,7 +347,7 @@ export async function POST(request: Request) {
     if (!bypassRouter && !perplexityUsage && isUncertainResponse(aiTextOutput)) {
       console.log('[Perplexity Fallback] Uncertainty detected in model response, querying Perplexity...');
       logToServer(`Perplexity Fallback model=${selectedModel}: uncertainty detected`, 'warn');
-      const perplexityResult = await queryPerplexity(messageContent);
+      const perplexityResult = await queryPerplexity(messageContent, [], apiKey);
       if (perplexityResult) {
         aiTextOutput = perplexityResult.answer;
         perplexityUsage = {
@@ -319,6 +360,7 @@ export async function POST(request: Request) {
     }
 
     await db.collection('messages').insertOne({
+      userId: new ObjectId(userId),
       threadId: activeThreadId,
       role: 'assistant',
       content: aiTextOutput || "",

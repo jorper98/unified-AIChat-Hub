@@ -1,7 +1,21 @@
 import { ObjectId } from 'mongodb';
 
+export interface UserDocument {
+  _id: ObjectId;
+  name: string;
+  email: string;
+  passwordHash: string;
+  role: 'admin' | 'user';
+  isEmailVerified: boolean;
+  emailVerificationToken: string | null;
+  openRouterApiKey: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface SettingsDocument {
   _id: string | ObjectId;
+  userId?: ObjectId;
   models?: any[];
   providers?: any[];
   theme?: string;
@@ -16,6 +30,7 @@ export interface SettingsDocument {
 
 export interface ThreadDocument {
   _id: ObjectId;
+  userId: ObjectId;
   name: string;
   currentModel: string;
   systemInstruction: string;
@@ -27,6 +42,7 @@ export interface ThreadDocument {
 
 export interface MessageDocument {
   _id: ObjectId;
+  userId: ObjectId;
   threadId: ObjectId;
   role: 'user' | 'assistant' | 'system';
   content: string;
