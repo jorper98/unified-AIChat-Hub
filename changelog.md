@@ -7,6 +7,8 @@
 - Updated About modal to display Docker update instructions instead of in-app apply button.
 - Optimized Dockerfile to use multi-stage builds and Next.js `standalone` output, significantly reducing production image size by excluding dev dependencies, source code, and build artifacts. Switched to Node.js 20 Alpine base image.
 - Simplified GitHub Actions workflow to use raw Docker CLI for reliable builds and transparent error output.
+- Fixed email verification API to return JSON responses instead of server-side redirects, fixing client-side fetch handling.
+- Replaced `NODE_ENV === 'production'` cookie security check with `SECURE_COOKIE` environment variable for HTTP-compatible deployments.
 - Bumped version to 0.4.2.
 
 ## v0.4.1

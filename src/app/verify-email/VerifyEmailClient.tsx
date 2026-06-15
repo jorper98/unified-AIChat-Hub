@@ -21,16 +21,21 @@ export default function VerifyEmailClient() {
     const verify = async () => {
       try {
         const res = await fetch(`/api/auth/verify?token=${token}`);
-        if (res.redirected) {
-          const url = new URL(res.url);
-          if (url.searchParams.get('error')) {
-            setStatus('error');
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          setStatus('error');
+          if (data.error === 'missing_token') {
+            setMessage('Verification token is missing.');
+          } else if (data.error === 'invalid_token') {
             setMessage('Verification failed. The token may be invalid or expired.');
-          } else if (url.searchParams.get('success') === 'verified') {
-            setStatus('success');
-            setMessage('Email verified successfully! Redirecting to login...');
-            setTimeout(() => router.push('/login'), 2000);
+          } else {
+            setMessage('An error occurred during verification.');
           }
+        } else {
+          setStatus('success');
+          setMessage('Email verified successfully! Redirecting to login...');
+          setTimeout(() => router.push('/login'), 2000);
         }
       } catch (err) {
         setStatus('error');
