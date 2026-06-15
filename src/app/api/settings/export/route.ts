@@ -17,21 +17,38 @@ export async function GET(request: NextRequest) {
 
     const db = await getDb();
     const userId = new ObjectId(decoded.userId);
+    const isAdmin = decoded.role === 'admin';
 
-    const threads = await db.collection('threads').find({ userId }).toArray();
-    const messages = await db.collection('messages').find({ userId }).toArray();
-    const settings = await db.collection('settings').find({ userId }).toArray();
-    const prompts = await db.collection('system_prompts').find({ userId }).toArray();
+    // Admins export ALL data; regular users only export their own
+    const filter = isAdmin ? {} : { userId };
+
+    const threads = await db.collection('threads').find(filter).toArray();
+    const messages = await db.collection('messages').find(filter).toArray();
+    const settings = await db.collection('settings').find(filter).toArray();
+    const prompts = await db.collection('system_prompts').find(filter).toArray();
+    
+    // Only admins get full user list in backup
+    const users = isAdmin ? await db.collection('users').find({}).toArray() : [];
 
     const backup = {
-      version: '0.4.0',
+      version: '0.4.6',
+      exportedBy: { name: decoded.name, email: decoded.email, role: decoded.role },
       exportedAt: new Date().toISOString(),
-      userId: decoded.userId,
       collections: {
         threads: threads.map(t => ({ ...t, _id: t._id.toString() })),
         messages: messages.map(m => ({ ...m, _id: m._id.toString(), threadId: m.threadId.toString() })),
         settings: settings.map(s => ({ ...s, _id: s._id.toString() })),
-        prompts: prompts.map(p => ({ ...p, _id: p._id.toString() }))
+        prompts: prompts.map(p => ({ ...p, _id: p._id.toString() })),
+        users: users.map(u => ({ 
+          _id: u._id.toString(),
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          isEmailVerified: u.isEmailVerified,
+          createdAt: u.createdAt,
+          updatedAt: u.updatedAt,
+          // Exclude password hashes from backup for security
+        }))
       }
     };
 
