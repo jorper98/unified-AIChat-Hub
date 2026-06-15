@@ -6,6 +6,16 @@
 - Bumped version to 0.4.4.
 
 ## v0.4.3
+- Fixed EACCES permission errors on mounted volumes by removing restrictive non-root user in Docker runtime stage.
+- Bumped version to 0.4.5.
+
+## v0.4.4
+- Fixed login on HTTP deployments by replacing NODE_ENV === 'production' cookie Secure flag with SECURE_COOKIE environment variable.
+- Changed email verification API to return JSON responses instead of server-side redirects, fixing client-side fetch handling in VerifyEmailClient.
+- Fixed SECURE_COOKIE documentation in .env.example and removed deprecated OTA update fields.
+- Bumped version to 0.4.4.
+
+## v0.4.3
 - Replaced Over-The-Air (OTA) in-app update mechanism with pre-built Docker image deployment workflow.
 - Migrated deployment process to GitHub Actions for automated build and push to GitHub Container Registry.
 - Restructured `package-for-deploy.ps1` to act as a release orchestrator (version bumping and git tagging).
