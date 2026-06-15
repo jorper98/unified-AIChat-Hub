@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.4.1
+- Security and other improvements.
+
 ## v0.4.0
 - Added full authentication system with user registration, email verification, secure login, and "remember me" for 24 hours.
 - Strict per-user data isolation: threads, messages, and settings are now isolated by user ID.

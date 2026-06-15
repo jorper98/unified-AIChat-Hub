@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { verifyAuthToken } from '@/lib/auth';
-import { decrypt } from '@/lib/encryption';
 import { ObjectId } from 'mongodb';
 
 export async function GET(request: NextRequest) {
@@ -26,15 +25,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    let openRouterApiKey = null;
-    if (user.openRouterApiKey) {
-      try {
-        openRouterApiKey = decrypt(user.openRouterApiKey);
-      } catch (error) {
-        console.error('Decryption error for API key:', error);
-      }
-    }
-
     return NextResponse.json({
       user: {
         id: user._id,
@@ -42,7 +32,7 @@ export async function GET(request: NextRequest) {
         email: user.email,
         role: user.role,
         isEmailVerified: user.isEmailVerified,
-        openRouterApiKey,
+        hasApiKey: !!user.openRouterApiKey,
       },
     });
   } catch (error) {

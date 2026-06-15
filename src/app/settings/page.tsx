@@ -108,6 +108,7 @@ export default function SettingsPage() {
   const [timezone, setTimezone] = useState('UTC');
   const [weatherLocation, setWeatherLocation] = useState('');
   const [apiKey, setApiKey] = useState('');
+  const [hasExistingKey, setHasExistingKey] = useState(false);
   const [savingApiKey, setSavingApiKey] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
@@ -366,7 +367,10 @@ export default function SettingsPage() {
       const res = await fetch('/api/settings/api-key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey }),
+        body: JSON.stringify({ 
+                apiKey: apiKey === '••••••••••••••••' ? '' : apiKey,
+                remove: !apiKey && !hasExistingKey
+              }),
       });
       if (res.ok) {
         showToast('API key saved successfully!');
