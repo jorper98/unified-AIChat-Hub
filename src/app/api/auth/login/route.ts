@@ -29,18 +29,22 @@ export async function POST(request: NextRequest) {
     const user = await usersCollection.findOne({ email: email.toLowerCase() });
 
     if (!user) {
+      console.log(`[Login] Failed: ${email}`);
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 
     const isPasswordValid = await comparePassword(password, user.passwordHash);
     if (!isPasswordValid) {
+      console.log(`[Login] Failed: ${email}`);
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 
     if (!user.isEmailVerified) {
+      console.log(`[Login] Failed (unverified): ${email}`);
       return NextResponse.json({ error: 'Please verify your email address before logging in' }, { status: 403 });
     }
 
+    console.log(`[Login] Succeeded: ${user.name} <${user.email}>`);
     const token = generateAuthToken(user._id.toString(), user.role, rememberMe);
 
     const response = NextResponse.json({
