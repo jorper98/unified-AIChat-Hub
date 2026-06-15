@@ -536,7 +536,7 @@ export default function UnifiedChatInterface() {
     if (!input.trim() || loading || !model) return;
 
     // Require API key for all users EXCEPT admin (who can fall back to global .env key)
-    if (!user?.openRouterApiKey && user?.role !== 'admin') {
+    if (!user?.hasApiKey && user?.role !== 'admin') {
       setShowApiKeyWarning(true);
       return;
     }

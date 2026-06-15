@@ -13,17 +13,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const { apiKey } = await request.json();
+    const { apiKey, remove } = await request.json();
     const db = await getDb();
 
-    let encryptedKey = null;
-    if (apiKey && apiKey.trim() !== '') {
-      encryptedKey = encrypt(apiKey.trim());
+    let updateData: any = { updatedAt: new Date() };
+    if (remove) {
+      updateData.openRouterApiKey = null;
+    } else if (apiKey && apiKey.trim() !== '') {
+      updateData.openRouterApiKey = encrypt(apiKey.trim());
     }
 
     await db.collection('users').updateOne(
       { _id: new ObjectId(decoded.userId) },
-      { $set: { openRouterApiKey: encryptedKey, updatedAt: new Date() } }
+      { $set: updateData }
     );
 
     return NextResponse.json({ success: true });
