@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import packageJson from '../../../package.json';
 
 const APP_VERSION = packageJson.version;
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
@@ -20,7 +20,7 @@ export default function LoginPage() {
     if (err === 'missing_token') setError('Verification token is missing.');
     else if (err === 'invalid_token') setError('Invalid or expired verification token.');
     else if (err === 'server_error') setError('An error occurred during verification.');
-    
+
     const success = searchParams.get('success');
     if (success === 'verified') setError('');
   }, [searchParams]);
@@ -92,7 +92,7 @@ export default function LoginPage() {
               <input
                 type="checkbox"
                 checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
+                onChange={(e) => setRememberMe(e.checked)}
                 className="h-4 w-4 rounded border-gray-700 bg-gray-900 text-blue-500 focus:ring-blue-500"
               />
               <span className="text-sm text-gray-300">Remember me for 24 hours</span>
@@ -130,5 +130,20 @@ export default function LoginPage() {
         </footer>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-gray-900 p-4">
+        <div className="w-full max-w-md rounded-xl bg-gray-800 p-8 text-center shadow-xl">
+          <h1 className="text-2xl font-bold text-white">Unified Chat Hub</h1>
+          <p className="mt-4 text-gray-400">Loading...</p>
+        </div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }
