@@ -55,27 +55,34 @@ export async function GET(request: NextRequest) {
     const zip = new JSZip();
     zip.file('data.json', JSON.stringify(backup, null, 2));
 
-    const imagesDir = path.join(process.cwd(), 'public', 'images');
-    if (fs.existsSync(imagesDir)) {
-      const files = fs.readdirSync(imagesDir);
+    // Export images specifically for the current user to maintain data isolation
+    const imagesBaseDir = path.join(process.cwd(), 'public', 'images');
+    const userImagesDir = path.join(imagesBaseDir, decoded.userId);
+    
+    if (fs.existsSync(userImagesDir)) {
+      const files = fs.readdirSync(userImagesDir);
       const imagesFolder = zip.folder('images');
       if (imagesFolder) {
         for (const file of files) {
-          const filePath = path.join(imagesDir, file);
-          const content = fs.readFileSync(filePath);
-          imagesFolder.file(file, content);
+          const filePath = path.join(userImagesDir, file);
+          const stat = fs.statSync(filePath);
+          if (stat.isFile()) {
+            const content = fs.readFileSync(filePath);
+            imagesFolder.file(file, content);
+          }
         }
       }
     }
 
-    const buffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 9 } });
+    // Use uint8array to prevent Next.js from corrupting the buffer response
+    const uint8array = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', compressionOptions: { level: 9 } });
     const filename = `unified-chat-backup-${Date.now()}.zip`;
 
-    return new NextResponse(buffer as unknown as BodyInit, {
+    return new NextResponse(uint8array, {
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="${filename}"`,
-        'Content-Length': String(buffer.length)
+        'Content-Length': String(uint8array.length)
       }
     });
   } catch (error: any) {
