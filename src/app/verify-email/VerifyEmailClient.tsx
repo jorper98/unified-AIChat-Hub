@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function VerifyEmailClient() {
@@ -8,8 +8,13 @@ export default function VerifyEmailClient() {
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'verifying' | 'success' | 'error'>('verifying');
   const [message, setMessage] = useState('Verifying your email address...');
+  const hasVerified = useRef(false);
 
   useEffect(() => {
+    // Prevent React 18 Strict Mode from double-executing the verification request
+    if (hasVerified.current) return;
+    hasVerified.current = true;
+
     const token = searchParams.get('token');
 
     if (!token) {
@@ -28,14 +33,14 @@ export default function VerifyEmailClient() {
           if (data.error === 'missing_token') {
             setMessage('Verification token is missing.');
           } else if (data.error === 'invalid_token') {
-            setMessage('Verification failed. The token may be invalid or expired.');
+            setMessage('Verification failed. The token may be invalid, expired, or already used.');
           } else {
             setMessage('An error occurred during verification.');
           }
         } else {
           setStatus('success');
           setMessage('Email verified successfully! Redirecting to login...');
-          setTimeout(() => router.push('/login'), 2000);
+          setTimeout(() => router.push('/login?success=verified'), 2000);
         }
       } catch (err) {
         setStatus('error');

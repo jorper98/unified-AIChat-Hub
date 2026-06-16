@@ -3,10 +3,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { CostCalculator } from './components/CostCalculator';
-import { RawDataModal } from './components/RawDataModal';
 import { ThreadSidebar } from './components/ThreadSidebar';
 import { MessageArea } from './components/MessageArea';
 import { ChatInput } from './components/ChatInput';
+import { RawDataModal } from './components/RawDataModal';
 import { PromptModal } from './components/PromptModal';
 import { ArchiveModal } from './components/ArchiveModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
@@ -15,6 +15,7 @@ import { ReadmeModal } from './components/ReadmeModal';
 import { SettingsModal } from './components/SettingsModal';
 import { GlobalCostModal } from './components/GlobalCostModal';
 import { ImageGalleryModal } from './components/ImageGalleryModal';
+import { WelcomeModal } from './components/WelcomeModal';
 import { estimateTokens, formatTokenCount, MODEL_CONTEXT_LIMITS, MODEL_PRICING } from '@/lib/tokens';
 import { ChatTurn, ThreadSummary, ThreadMetadata, DropdownModel, SavedPrompt } from '@/types';
 import packageJson from '../../package.json';
@@ -85,6 +86,7 @@ export default function UnifiedChatInterface() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
   const [showApiKeyWarning, setShowApiKeyWarning] = useState(false);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -100,7 +102,13 @@ export default function UnifiedChatInterface() {
         return res.ok ? res.json() : null;
       })
       .then(data => {
-        if (data?.user) setUser(data.user);
+        if (data?.user) {
+          setUser(data.user);
+          // Show welcome modal for new non-admin users who haven't seen it
+          if (data.user.role !== 'admin' && !data.user.hasSeenWelcomeModal) {
+            setShowWelcomeModal(true);
+          }
+        }
       })
       .catch(() => {});
   }, []);
@@ -808,6 +816,12 @@ export default function UnifiedChatInterface() {
       <ImageGalleryModal
         isOpen={showImageGallery}
         onClose={() => setShowImageGallery(false)}
+        isDark={isDark}
+      />
+
+      <WelcomeModal
+        isOpen={showWelcomeModal}
+        onClose={() => setShowWelcomeModal(false)}
         isDark={isDark}
       />
 

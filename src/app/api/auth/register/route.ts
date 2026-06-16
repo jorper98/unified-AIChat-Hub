@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
       emailVerificationToken: verificationToken,
       openRouterApiKey: null,
       freeUses: 0,
+      hasSeenWelcomeModal: false,
       createdAt: new Date(),
       updatedAt: new Date(),
     });

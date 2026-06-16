@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const userImagesDir = path.join(BASE_IMAGES_DIR, targetUserId);
     
     if (!fs.existsSync(userImagesDir)) {
-      return NextResponse.json({ images: [] });
+      return NextResponse.json({ images: [], targetUserId, isAdmin });
     }
     
     const files = fs.readdirSync(userImagesDir);
