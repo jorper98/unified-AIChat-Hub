@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.4.8
+- Fixed backup export corruption ("No END header found") by switching ZIP generation to `Uint8Array`.
+- Fixed backup export to correctly read and package images from the user-specific folder (`public/images/{userId}/`).
+- Fixed backup import to restore images into the currently logged-in user's specific folder, ensuring strict data isolation.
+
 ## v0.4.7
 - Defaulted application theme to light mode, including the Login and Register pages.
 - Restricted server logs access to admin users only (returns 403 Forbidden for non-admins).

@@ -48,7 +48,6 @@ export async function POST(request: NextRequest) {
 
     const db = await getDb();
     const currentUserId = new ObjectId(decoded.userId);
-    const imagesDir = path.join(process.cwd(), 'public', 'images');
 
     // Helper to safely convert IDs: only valid 24-char hex strings become ObjectIds
     const safeObjectId = (id: any) => {
@@ -118,13 +117,15 @@ export async function POST(request: NextRequest) {
     }
 
     let imagesRestored = 0;
+    const userImagesDir = path.join(process.cwd(), 'public', 'images', decoded.userId);
+    if (!fs.existsSync(userImagesDir)) {
+      fs.mkdirSync(userImagesDir, { recursive: true });
+    }
+
     for (const entry of zipEntries) {
       if (entry.entryName.startsWith('images/') && !entry.isDirectory) {
         const fileName = path.basename(entry.entryName);
-        const targetPath = path.join(imagesDir, fileName);
-        if (!fs.existsSync(imagesDir)) {
-          fs.mkdirSync(imagesDir, { recursive: true });
-        }
+        const targetPath = path.join(userImagesDir, fileName);
         fs.writeFileSync(targetPath, entry.getData());
         imagesRestored++;
       }
