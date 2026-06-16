@@ -20,20 +20,33 @@ export function ImageGalleryModal({ isOpen, onClose, isDark }: ImageGalleryModal
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<ImageInfo | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [users, setUsers] = useState<any[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [targetUserId, setTargetUserId] = useState<string>('');
 
   useEffect(() => {
     if (isOpen && !selectedImage) {
       loadImages();
     }
-  }, [isOpen, selectedImage]);
+  }, [isOpen, selectedImage, targetUserId]);
 
   const loadImages = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/images');
+      const url = targetUserId ? `/api/images?targetUserId=${targetUserId}` : '/api/images';
+      const res = await fetch(url);
       const data = await res.json();
       if (data.images) {
         setImages(data.images);
+        if (data.isAdmin && !isAdmin) {
+          setIsAdmin(true);
+          // Fetch users for dropdown
+          const usersRes = await fetch('/api/admin/users');
+          const usersData = await usersRes.json();
+          if (usersData.users) {
+            setUsers(usersData.users);
+          }
+        }
       }
     } catch (err) {
       console.error("Failed to fetch images:", err);
@@ -45,7 +58,10 @@ export function ImageGalleryModal({ isOpen, onClose, isDark }: ImageGalleryModal
     if (!confirm(`Are you sure you want to delete ${filename}?`)) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/images?filename=${encodeURIComponent(filename)}`, { method: 'DELETE' });
+      const url = targetUserId 
+        ? `/api/images?filename=${encodeURIComponent(filename)}&targetUserId=${targetUserId}`
+        : `/api/images?filename=${encodeURIComponent(filename)}`;
+      const res = await fetch(url, { method: 'DELETE' });
       if (res.ok) {
         setImages(prev => prev.filter(img => img.name !== filename));
         if (selectedImage?.name === filename) {
@@ -89,9 +105,23 @@ export function ImageGalleryModal({ isOpen, onClose, isDark }: ImageGalleryModal
         onClick={(e) => e.stopPropagation()}
       >
         <div className={`flex justify-between items-center p-4 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-          <h3 className={`text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
-            {selectedImage ? selectedImage.name : 'Generated Images Gallery'}
-          </h3>
+          <div className="flex items-center gap-4">
+            <h3 className={`text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+              {selectedImage ? selectedImage.name : 'Generated Images Gallery'}
+            </h3>
+            {isAdmin && !selectedImage && (
+              <select
+                value={targetUserId}
+                onChange={(e) => setTargetUserId(e.target.value)}
+                className={`text-xs rounded px-2 py-1 focus:outline-none focus:border-indigo-500 ${isDark ? 'bg-gray-800 border-gray-700 text-gray-200' : 'bg-gray-100 border-gray-300 text-gray-900'}`}
+              >
+                <option value="">My Images</option>
+                {users.map(user => (
+                  <option key={user._id} value={user._id}>{user.name} ({user.email})</option>
+                ))}
+              </select>
+            )}
+          </div>
           <button onClick={() => selectedImage ? setSelectedImage(null) : onClose()} className={`${isDark ? 'text-gray-500 hover:text-white' : 'text-gray-400 hover:text-gray-900'}`}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

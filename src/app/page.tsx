@@ -536,7 +536,8 @@ export default function UnifiedChatInterface() {
     if (!input.trim() || loading || !model) return;
 
     // Require API key for all users EXCEPT admin (who can fall back to global .env key)
-    if (!user?.hasApiKey && user?.role !== 'admin') {
+    // or users who still have free uses remaining (< 15)
+    if (!user?.hasApiKey && user?.role !== 'admin' && (user?.freeUses || 0) >= 15) {
       setShowApiKeyWarning(true);
       return;
     }
@@ -581,6 +582,12 @@ export default function UnifiedChatInterface() {
         }
         return;
       }
+      
+      // Update user freeUses count if the backend returned it
+      if (data.freeUses !== undefined && user) {
+        setUser({ ...user, freeUses: data.freeUses });
+      }
+
       if (data.threadId) {
         setThreadId(data.threadId);
         
@@ -824,7 +831,7 @@ export default function UnifiedChatInterface() {
                 Cancel
               </button>
               <button
-                onClick={() => router.push('/settings')}
+                onClick={() => router.push('/settings?tab=utility-llms')}
                 className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition"
               >
                 Go to Settings

@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.4.7
+- Defaulted application theme to light mode, including the Login and Register pages.
+- Restricted server logs access to admin users only (returns 403 Forbidden for non-admins).
+- Added 15 free API calls for new users using the master OpenRouter key before requiring them to configure their own key in Settings.
+- Added a visual credit badge in the sidebar showing remaining free uses for non-admin users, with instant UI updates after each message.
+- Fixed "Go to Settings" button in API Key warning to navigate directly to the Utility LLMs tab.
+- Fixed API key clearing bug where empty strings were ignored instead of removing the key from the database.
+- Fixed Global Cost Breakdown to strictly filter by the current user's ID for proper data isolation.
+- Implemented user-specific image folders (`public/images/{userId}/`) to ensure image gallery data isolation.
+- Added admin capability to traverse and view other users' image folders via a dropdown in the Image Gallery modal.
+- Fixed image generation crash caused by missing `userId` parameter in the response parser.
+- Removed unnecessary console logs from CostCalculator for a cleaner development experience.
+
 ## v0.4.4
 - Fixed login on HTTP deployments by replacing `NODE_ENV === 'production'` cookie Secure flag with `SECURE_COOKIE` environment variable.
 - Changed email verification API to return JSON responses instead of server-side redirects, fixing client-side fetch handling in `VerifyEmailClient`.

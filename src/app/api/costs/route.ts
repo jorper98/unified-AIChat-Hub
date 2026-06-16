@@ -1,19 +1,26 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { MODEL_PRICING } from '@/lib/tokens';
+import { getCurrentUserId } from '@/lib/user';
+import { ObjectId } from 'mongodb';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
+    const userId = await getCurrentUserId(request);
+    if (!userId) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const scope = searchParams.get('scope') || 'active';
 
     const db = await getDb();
     
-    let threadMatch = {};
+    let threadMatch: any = { userId: new ObjectId(userId) };
     if (scope === 'active') {
-      threadMatch = { $or: [{ archived: { $exists: false } }, { archived: false }] };
+      threadMatch.$or = [{ archived: { $exists: false } }, { archived: false }];
     } else if (scope === 'archived') {
-      threadMatch = { archived: true };
+      threadMatch.archived = true;
     }
 
     const threads = await db.collection('threads').find(threadMatch).project({ _id: 1 }).toArray();

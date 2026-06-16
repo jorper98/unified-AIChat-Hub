@@ -116,6 +116,7 @@ export default function SettingsPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [resettingUserId, setResettingUserId] = useState<string | null>(null);
+  const [resettingCreditsUserId, setResettingCreditsUserId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
   // Testing state
@@ -132,6 +133,15 @@ export default function SettingsPage() {
     setMounted(true);
     const saved = localStorage.getItem('theme') as 'dark' | 'light' | null;
     if (saved) setTheme(saved);
+    
+    // Check for tab query parameter to open a specific section on load
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab && ['models', 'providers', 'theme', 'global-prompt', 'utility-llms', 'backup', 'testing', 'users'].includes(tab)) {
+        setActiveSection(tab as SettingsSection);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -641,6 +651,29 @@ export default function SettingsPage() {
       }
     } catch (e: any) {
       showToast('Failed to delete user', 'error');
+    }
+  };
+
+  const handleResetCredits = async (userId: string, userName: string) => {
+    if (!confirm(`Are you sure you want to reset free uses to 0 for ${userName}?`)) return;
+    setResettingCreditsUserId(userId);
+    try {
+      const res = await fetch('/api/admin/users/credits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast('Free uses reset to 0 successfully', 'success');
+        loadUsers();
+      } else {
+        showToast(data.error || 'Failed to reset credits', 'error');
+      }
+    } catch (e: any) {
+      showToast('Failed to reset credits', 'error');
+    } finally {
+      setResettingCreditsUserId(null);
     }
   };
 
@@ -1446,6 +1479,7 @@ export default function SettingsPage() {
                             <th className="px-4 py-3">Email</th>
                             <th className="px-4 py-3">Role</th>
                             <th className="px-4 py-3">Verified</th>
+                            <th className="px-4 py-3">Free Uses</th>
                             <th className="px-4 py-3 text-right">Actions</th>
                           </tr>
                         </thead>
@@ -1466,6 +1500,9 @@ export default function SettingsPage() {
                                   <span className="text-red-400">No</span>
                                 )}
                               </td>
+                              <td className="px-4 py-3 text-gray-300 font-mono">
+                                {user.freeUses || 0} / 15
+                              </td>
                               <td className="px-4 py-3 text-right space-x-2">
                                 <button
                                   onClick={() => handleResetPassword(user._id, user.name)}
@@ -1475,12 +1512,21 @@ export default function SettingsPage() {
                                   {resettingUserId === user._id ? 'Resetting...' : 'Reset Pwd'}
                                 </button>
                                 {user.role !== 'admin' && (
-                                  <button
-                                    onClick={() => handleDeleteUser(user._id, user.name)}
-                                    className="px-2 py-1 rounded text-xs bg-red-900/30 text-red-400 hover:bg-red-900/50 border border-red-800/50"
-                                  >
-                                    Delete
-                                  </button>
+                                  <>
+                                    <button
+                                      onClick={() => handleResetCredits(user._id, user.name)}
+                                      disabled={resettingCreditsUserId === user._id}
+                                      className="px-2 py-1 rounded text-xs bg-green-900/30 text-green-400 hover:bg-green-900/50 border border-green-800/50 disabled:opacity-50"
+                                    >
+                                      {resettingCreditsUserId === user._id ? 'Resetting...' : 'Reset Credits'}
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteUser(user._id, user.name)}
+                                      className="px-2 py-1 rounded text-xs bg-red-900/30 text-red-400 hover:bg-red-900/50 border border-red-800/50"
+                                    >
+                                      Delete
+                                    </button>
+                                  </>
                                 )}
                               </td>
                             </tr>
