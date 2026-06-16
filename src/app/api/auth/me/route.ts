@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
         role: user.role,
         isEmailVerified: user.isEmailVerified,
         hasApiKey: !!user.openRouterApiKey,
+        freeUses: user.freeUses || 0,
       },
     });
   } catch (error) {

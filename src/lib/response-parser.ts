@@ -5,7 +5,7 @@ export interface ParsedResponse {
   hasImages: boolean;
 }
 
-export function parseModelResponse(completionData: any): ParsedResponse {
+export function parseModelResponse(completionData: any, userId: string): ParsedResponse {
   let aiTextOutput = "";
   let foundImages = false;
 
@@ -33,7 +33,7 @@ export function parseModelResponse(completionData: any): ParsedResponse {
       const inlineData = part.inlineData?.data || part.inlineData?.inlineData;
       if (inlineData) {
         const mimeType = part.inlineData?.mimeType || 'image/png';
-        const imageUrl = saveBase64Image(inlineData, mimeType);
+        const imageUrl = saveBase64Image(inlineData, mimeType, userId);
         aiTextOutput += `\n\n![Generated Image](${imageUrl})`;
         foundImages = true;
       }
@@ -43,7 +43,7 @@ export function parseModelResponse(completionData: any): ParsedResponse {
         if (url.startsWith('data:image')) {
           const match = url.match(/data:(image\/[a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=]+)/);
           if (match) {
-            aiTextOutput += `\n\n![Generated Image](${saveBase64Image(match[2], match[1])})`;
+            aiTextOutput += `\n\n![Generated Image](${saveBase64Image(match[2], match[1], userId)})`;
             foundImages = true;
           }
         } else {
@@ -73,7 +73,7 @@ export function parseModelResponse(completionData: any): ParsedResponse {
         if (url.startsWith('data:image')) {
           const match = url.match(/data:(image\/[a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=]+)/);
           if (match) {
-            aiTextOutput += `\n\n![Generated Image](${saveBase64Image(match[2], match[1])})`;
+            aiTextOutput += `\n\n![Generated Image](${saveBase64Image(match[2], match[1], userId)})`;
             foundImages = true;
           }
         } else {
@@ -84,7 +84,7 @@ export function parseModelResponse(completionData: any): ParsedResponse {
         if (img.url.startsWith('data:image')) {
           const match = img.url.match(/data:(image\/[a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=]+)/);
           if (match) {
-            aiTextOutput += `\n\n![Generated Image](${saveBase64Image(match[2], match[1])})`;
+            aiTextOutput += `\n\n![Generated Image](${saveBase64Image(match[2], match[1], userId)})`;
             foundImages = true;
           }
         } else {
@@ -94,7 +94,7 @@ export function parseModelResponse(completionData: any): ParsedResponse {
       } else if (img.base64 || img.data) {
         const base64Data = img.base64 || img.data;
         const mimeType = img.mime_type || img.mimeType || 'image/png';
-        aiTextOutput += `\n\n![Generated Image](${saveBase64Image(base64Data, mimeType)})`;
+        aiTextOutput += `\n\n![Generated Image](${saveBase64Image(base64Data, mimeType, userId)})`;
         foundImages = true;
       }
     }

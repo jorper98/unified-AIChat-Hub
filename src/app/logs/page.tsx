@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 
 export default function ServerLogsPage() {
   const [logs, setLogs] = useState('');
+  const [error, setError] = useState('');
   const [logFilter, setLogFilter] = useState<'all' | 'info' | 'warn' | 'error'>('all');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [isDark, setIsDark] = useState(true);
@@ -11,8 +12,13 @@ export default function ServerLogsPage() {
   const fetchLogs = async () => {
     try {
       const res = await fetch('/api/logs?limit=2000');
+      if (res.status === 403) {
+        setError('Admin access required');
+        return;
+      }
       const data = await res.json();
       if (data.logs) {
+        setError('');
         console.log('[Logs] Received', data.logs.length, 'chars');
         setLogs(data.logs);
       } else {
@@ -55,7 +61,17 @@ export default function ServerLogsPage() {
 
   return (
     <div className={`min-h-screen flex flex-col ${isDark ? 'bg-gray-950 text-gray-100' : 'bg-gray-50 text-gray-900'}`}>
-      <header className={`flex items-center justify-between px-4 py-2 border-b ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
+      {error && (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-xl font-bold text-red-500 mb-2">Access Denied</h2>
+            <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{error}</p>
+          </div>
+        </div>
+      )}
+      {!error && (
+        <>
+          <header className={`flex items-center justify-between px-4 py-2 border-b ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
         <div className="flex items-center gap-3">
           <h1 className="text-sm font-bold text-indigo-400">Server Logs</h1>
           <span className={`text-[9px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>data/logs/server.log</span>
@@ -104,6 +120,8 @@ export default function ServerLogsPage() {
       <footer className={`px-4 py-1 border-t text-[9px] ${isDark ? 'bg-gray-900 border-gray-800 text-gray-600' : 'bg-white border-gray-200 text-gray-400'}`}>
         {logs ? `${filteredLines.length} lines shown` : 'No logs available'} · Auto-refresh: {autoRefresh ? '2s' : 'off'}
       </footer>
+        </>
+      )}
     </div>
   );
 }

@@ -27,16 +27,15 @@ export async function POST(request: NextRequest) {
     const db = await getDb();
     const userDoc = await db.collection('users').findOne({ _id: new ObjectId(userId) });
     const isAdmin = userDoc?.role === 'admin';
+    const freeUses = userDoc?.freeUses || 0;
 
-    // Enforce API key requirement for non-admin users
-    if (!isAdmin && !userDoc?.openRouterApiKey) {
+    if (!isAdmin && !userDoc?.openRouterApiKey && freeUses >= 15) {
       return NextResponse.json({ 
-        error: 'Missing API Key. Please configure your OpenRouter API key in Settings.',
+        error: 'You have used your 15 free API calls. Please configure your OpenRouter API key in Settings.',
         code: 'MISSING_API_KEY'
       }, { status: 400 });
     }
 
-    // Get API key: user's key, or fallback to env for admin
     let apiKey: string | undefined = undefined;
     if (userDoc?.openRouterApiKey) {
       try {
@@ -46,8 +45,13 @@ export async function POST(request: NextRequest) {
         console.error('Failed to decrypt user API key:', error);
       }
     }
-    if (!apiKey && isAdmin) {
+    
+    let incrementFreeUses = false;
+    if (!apiKey && (isAdmin || freeUses < 15)) {
       apiKey = process.env.OPENROUTER_API_KEY;
+      if (!isAdmin && freeUses < 15) {
+        incrementFreeUses = true;
+      }
     }
 
     const { threadId, messageContent, selectedModel, systemInstruction, promptName, bypassRouter, threadName: requestedThreadName } = await request.json();
@@ -147,7 +151,7 @@ export async function POST(request: NextRequest) {
           const imageCompletionData = await imageResponse.json();
 
           if (imageCompletionData.choices?.[0]?.message) {
-            const parsed = parseModelResponse(imageCompletionData);
+            const parsed = parseModelResponse(imageCompletionData, userId);
             aiTextOutput = parsed.text;
             
             const imgUsage = imageCompletionData.usage || {};
@@ -328,7 +332,7 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        const parsed = parseModelResponse(completionData);
+        const parsed = parseModelResponse(completionData, userId);
         aiTextOutput = parsed.text;
         usage = completionData.usage || {};
         
@@ -342,7 +346,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Extract and save any base64 images in the response text, replace with markdown image links
-    aiTextOutput = extractAndSaveImages(aiTextOutput);
+    aiTextOutput = extractAndSaveImages(aiTextOutput, userId);
 
     if (!bypassRouter && !perplexityUsage && isUncertainResponse(aiTextOutput)) {
       console.log('[Perplexity Fallback] Uncertainty detected in model response, querying Perplexity...');
@@ -386,9 +390,19 @@ export async function POST(request: NextRequest) {
       createdAt: new Date()
     });
 
+    let updatedFreeUses = userDoc?.freeUses || 0;
+    if (incrementFreeUses) {
+      updatedFreeUses += 1;
+      await db.collection('users').updateOne(
+        { _id: new ObjectId(userId) },
+        { $inc: { freeUses: 1 } }
+      );
+    }
+
     return NextResponse.json({ 
       threadId: activeThreadId.toHexString(), 
       response: aiTextOutput,
+      freeUses: updatedFreeUses,
       routingTool: routerResult?.route === 'image_generation' ? imageGenerationModel : routerResult?.route === 'web_search' ? 'web_search' : 'direct',
       perplexityUsed: perplexityUsage ? true : false,
       usage: {

@@ -153,11 +153,13 @@ export function ThreadSidebar({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </Link>
-          <button onClick={() => window.open('/logs', 'serverLogs', 'width=1200,height=800,scrollbars=yes,resizable=yes')} className={`p-1.5 rounded transition ${isDark ? 'text-gray-500 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'}`} title="Server Logs (new window)">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </button>
+          {user?.role === 'admin' && (
+            <button onClick={() => window.open('/logs', 'serverLogs', 'width=1200,height=800,scrollbars=yes,resizable=yes')} className={`p-1.5 rounded transition ${isDark ? 'text-gray-500 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'}`} title="Server Logs (new window)">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
@@ -175,7 +177,18 @@ export function ThreadSidebar({
               {user.name.charAt(0).toUpperCase()}
             </div>
             <div className="flex flex-col overflow-hidden flex-1 min-w-0">
-              <span className={`text-xs font-medium truncate ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>{user.name}</span>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-medium truncate ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>{user.name}</span>
+                {user.role !== 'admin' && !user.hasApiKey && (
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold ${
+                    (15 - (user.freeUses || 0)) > 5 
+                      ? (isDark ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-700')
+                      : (isDark ? 'bg-yellow-900/50 text-yellow-400' : 'bg-yellow-100 text-yellow-700')
+                  }`}>
+                    {15 - (user.freeUses || 0)}
+                  </span>
+                )}
+              </div>
               <span className={`text-[10px] truncate ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{user.email}</span>
             </div>
           </div>

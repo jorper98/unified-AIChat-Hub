@@ -184,10 +184,6 @@ export function CostCalculator({ messages }: CostCalculatorProps) {
       });
     }
 
-    console.log('[CostCalculator] Router tracking:', { routerCount, routerTotalTokens, routerTotalCost });
-    console.log('[CostCalculator] Perplexity tracking:', { perplexityCount, perplexityTotalCost });
-    console.log('[CostCalculator] Image Gen tracking:', { imageGenCount, imageGenTotalCost, imageGenModelName });
-
     return { models: results, grandTotal };
   }, [messages]);
 

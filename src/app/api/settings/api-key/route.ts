@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     const db = await getDb();
 
     let updateData: any = { updatedAt: new Date() };
-    if (remove) {
+    if (remove || (typeof apiKey === 'string' && apiKey.trim() === '')) {
       updateData.openRouterApiKey = null;
     } else if (apiKey && apiKey.trim() !== '') {
       updateData.openRouterApiKey = encrypt(apiKey.trim());
