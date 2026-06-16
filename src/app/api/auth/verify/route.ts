@@ -6,6 +6,8 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const token = searchParams.get('token');
 
+    console.log('[Verify] Received token:', token, 'Length:', token?.length);
+
     if (!token) {
       return NextResponse.json({ error: 'missing_token' }, { status: 400 });
     }
@@ -14,6 +16,8 @@ export async function GET(request: NextRequest) {
     const usersCollection = db.collection('users');
 
     const user = await usersCollection.findOne({ emailVerificationToken: token });
+    
+    console.log('[Verify] User found:', user ? 'Yes' : 'No');
 
     if (!user) {
       return NextResponse.json({ error: 'invalid_token' }, { status: 400 });
@@ -26,6 +30,7 @@ export async function GET(request: NextRequest) {
       }
     );
 
+    console.log('[Verify] Successfully verified user:', user.email);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Verification error:', error);

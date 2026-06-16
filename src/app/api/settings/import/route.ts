@@ -65,23 +65,27 @@ export async function POST(request: NextRequest) {
       let skipped = 0;
 
       if (mode === 'replace') {
-        // Only delete current user's data, not global data
-        await collection.deleteMany({ userId: currentUserId });
         for (const item of items) {
-          // Force the userId to be the current authenticated user to prevent cross-user contamination
           const doc = { 
             ...item, 
             _id: safeObjectId(item._id),
             userId: currentUserId 
           };
           if (doc.threadId) doc.threadId = safeObjectId(doc.threadId);
-          await collection.insertOne(doc);
+          
+          // Use replaceOne with upsert to safely overwrite or create the document, 
+          // preventing duplicate _id errors if it already exists under a different context
+          await collection.replaceOne(
+            { _id: doc._id },
+            doc,
+            { upsert: true }
+          );
           inserted++;
         }
       } else {
         for (const item of items) {
-          // In merge mode, only check against current user's existing data
-          const existing = await collection.findOne({ _id: safeObjectId(item._id), userId: currentUserId });
+          // In merge mode, check if the _id already exists globally to prevent duplicate key errors
+          const existing = await collection.findOne({ _id: safeObjectId(item._id) });
           if (existing) {
             skipped++;
           } else {
