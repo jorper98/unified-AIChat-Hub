@@ -72,6 +72,7 @@ export default function SettingsPage() {
   const [validatingAll, setValidatingAll] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportExportModal, setShowImportExportModal] = useState(false);
   const [showProviderModal, setShowProviderModal] = useState(false);
   const [showOpenRouterModal, setShowOpenRouterModal] = useState(false);
   const [editingModel, setEditingModel] = useState<Model | null>(null);
@@ -311,10 +312,72 @@ export default function SettingsPage() {
   };
 
   const deleteProvider = (id: string) => {
-    // Prevent deleting openrouter
     if (id === 'openrouter') return;
     setProviders(prev => prev.filter(p => p.id !== id));
     setModels(prev => prev.filter(m => m.provider !== id));
+  };
+
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [importResult, setImportResult] = useState('');
+  const [importMode, setImportMode] = useState<'replace' | 'merge'>('merge');
+
+  const handleExportModels = async () => {
+    try {
+      setImporting(true);
+      const res = await fetch('/api/settings/models/export');
+      if (!res.ok) throw new Error('Failed to export');
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `unified-chat-models-providers-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setImportResult('Exported successfully!');
+    } catch (error: any) {
+      setImportError(error.message || 'Failed to export');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleImportModels = async (file: File, mode: 'replace' | 'merge') => {
+    try {
+      setImporting(true);
+      setImportError('');
+      setImportResult('');
+      const text = await file.text();
+      const data = JSON.parse(text);
+      
+      const res = await fetch('/api/settings/models/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data, mode })
+      });
+      
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to import');
+      }
+      
+      await res.json();
+      setImportResult(`Imported successfully (${mode} mode).`);
+      
+      fetch('/api/settings')
+        .then(res => res.json())
+        .then(data => {
+          if (data.models) setModels(data.models);
+          if (data.providers) setProviders(data.providers);
+        });
+    } catch (error: any) {
+      setImportError(error.message || 'Failed to parse or import file');
+    } finally {
+      setImporting(false);
+    }
   };
 
   const openEditProviderModal = (provider: Provider) => {
@@ -763,6 +826,10 @@ export default function SettingsPage() {
                   <div className="flex gap-2">
                     <button onClick={validateAll} disabled={validatingAll} className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded transition disabled:opacity-50">
                       {validatingAll ? 'Checking...' : 'Check All'}
+                    </button>
+                    <button onClick={() => setShowImportExportModal(true)} className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded transition flex items-center gap-1.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                      Import / Export
                     </button>
                     <button onClick={() => setShowAddModal(true)} className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded transition">+ Add Model</button>
                   </div>
@@ -1589,8 +1656,8 @@ export default function SettingsPage() {
                 </button>
               )}
               <div>
-                <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1 text-gray-500">Model ID</label>
-                <input type="text" value={modelId} onChange={(e) => setModelId(e.target.value)} placeholder="e.g., openai/gpt-4o" className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500" />
+                <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1 text-gray-500">Model Display Name</label>
+                <input type="text" value={modelName} onChange={(e) => setModelName(e.target.value)} placeholder="e.g., GPT-4o" className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500" />
               </div>
             </div>
             <div className="flex gap-2 justify-end mt-4">
@@ -1678,6 +1745,103 @@ export default function SettingsPage() {
             <div className="flex gap-2 justify-end mt-4">
               <button onClick={() => setShowProviderModal(false)} className="text-xs px-3 py-1.5 rounded bg-gray-700 text-gray-300 hover:bg-gray-600">Cancel</button>
               <button onClick={saveProvider} disabled={!providerName.trim() || !providerEndpoint.trim()} className="text-xs px-3 py-1.5 rounded bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50">{editingProvider ? 'Update' : 'Add'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import/Export Models & Providers Modal */}
+      {showImportExportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowImportExportModal(false)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative bg-gray-900 border border-gray-700 rounded-lg max-w-lg w-full mx-4 p-5 flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-200">Import / Export Models & Providers</h3>
+              <button onClick={() => { setShowImportExportModal(false); setImportError(''); setImportResult(''); setImportMode('merge'); }} className="text-gray-400 hover:text-white">
+                ✕
+              </button>
+            </div>
+            <div className="space-y-4 text-xs">
+              <div className="p-3 bg-gray-800/50 rounded border border-gray-700">
+                <p className="text-gray-400 mb-3">
+                  Export your current models and provider configurations to a JSON file, or import from a previously exported file.
+                  <br />
+                  <span className="text-indigo-400">Note:</span> This is specific to your user account settings.
+                </p>
+                <button 
+                  onClick={handleExportModels} 
+                  disabled={importing}
+                  className="w-full flex items-center justify-center gap-2 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 transition"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Export Configuration to JSON
+                </button>
+              </div>
+
+              <div className="p-3 bg-gray-800/50 rounded border border-gray-700">
+                <h4 className="font-semibold text-gray-300 mb-2">Import Configuration</h4>
+                <div className="mb-3">
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 block mb-1">Import Mode</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="importMode" 
+                        value="merge" 
+                        checked={importMode === 'merge'} 
+                        onChange={() => setImportMode('merge')}
+                        className="accent-indigo-500" 
+                      />
+                      <span className="text-gray-300">Merge (add new, keep existing)</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="importMode" 
+                        value="replace" 
+                        checked={importMode === 'replace'} 
+                        onChange={() => setImportMode('replace')}
+                        className="accent-red-500" 
+                      />
+                      <span className="text-red-400">Replace (overwrite all)</span>
+                    </label>
+                  </div>
+                </div>
+                
+                <label className="block w-full">
+                  <span className="sr-only">Choose file</span>
+                  <input 
+                    type="file" 
+                    accept=".json" 
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        handleImportModels(e.target.files[0], importMode);
+                        e.target.value = '';
+                      }
+                    }}
+                    disabled={importing}
+                    className="block w-full text-xs text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </label>
+              </div>
+
+              {importError && (
+                <div className="p-3 bg-red-900/20 border border-red-700/50 rounded text-red-400">
+                  Error: {importError}
+                </div>
+              )}
+              {importResult && (
+                <div className="p-3 bg-green-900/20 border border-green-700/50 rounded text-green-400">
+                  Success: {importResult}
+                </div>
+              )}
+              {importing && (
+                <div className="text-center text-gray-400 py-2">
+                  Processing...
+                </div>
+              )}
             </div>
           </div>
         </div>
