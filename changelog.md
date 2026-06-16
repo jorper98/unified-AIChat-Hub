@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.4.9
+- Added independent Import/Export for Models & Providers configuration, allowing users to back up and restore their model settings separately from general data.
+- Fixed duplicate "Model ID" field in the model add/edit modal; replaced with "Model Display Name".
+
 ## v0.4.8
 - Fixed backup export corruption ("No END header found") by switching ZIP generation to `Uint8Array`.
 - Fixed backup export to correctly read and package images from the user-specific folder (`public/images/{userId}/`).

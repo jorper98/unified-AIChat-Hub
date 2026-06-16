@@ -1,6 +1,6 @@
 # Unified Chat Hub
 
-## Version 0.4.8
+## Version 0.4.9
 
 ### About
 Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a unified interface for interacting with multiple LLM models within the same chat (Thread). You can search across all chats, track tokens and costs, and manage your interactions securely. It relies on OpenRouter, featuring an intelligent intent router that classifies queries and routes them to different tools or your directly selected LLM response. 
@@ -9,10 +9,10 @@ Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a un
 
 ### Features
 
-- **Strict Multi-User Authentication**: Secure registration, email verification, login with 24-hour "remember me", and clean logout flow.
-- **Per-User Data Isolation**: Threads, messages, settings, and prompts are strictly isolated by user ID.
-- **Individual API Key Management**: Each user securely stores their own encrypted OpenRouter API key. Admins can optionally use a global fallback key.
-- **Admin User Management**: Dedicated admin dashboard to view users, force password resets, and delete accounts safely.
+- Strict Multi-User Authentication: Secure registration, email verification, login with 24-hour "remember me", and clean logout flow.
+- Per-User Data Isolation: Threads, messages, settings, and prompts are strictly isolated by user ID.
+- Individual API Key Management: Each user securely stores their own encrypted OpenRouter API key. Admins can optionally use a global fallback key.
+- Admin User Management: Dedicated admin dashboard to view users, force password resets, and delete accounts safely.
 - Multi-model support via OpenRouter integration (GPT-4o, Claude, Gemini, DeepSeek, Qwen, MiniMax, Kimi, or any other available there)
 - Ability to use other providers including local models.
 - Persistant Context within the chat session (thread) while changing models
