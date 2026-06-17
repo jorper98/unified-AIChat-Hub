@@ -34,6 +34,25 @@ interface ThemeColors {
   borderAlt: string;
 }
 
+const defaultProvidersFromConfig: Provider[] = modelConfig.providers.map((p: any) => ({ id: p.id, name: p.name, type: p.type, endpoint: p.endpoint, apiKeyEnv: p.apiKeyEnv }));
+const defaultModelsFromConfig: Model[] = modelConfig.selectedModels.map((id: string) => {
+  for (const provider of modelConfig.providers) {
+    const model = provider.models.find((m: any) => m.id === id);
+    if (model) return { id: model.id, name: model.name, provider: provider.id };
+  }
+  return { id, name: id, provider: 'openrouter' };
+});
+
+function getDefaultRouterModel(): string {
+  return (modelConfig as any).routerModel || defaultModelsFromConfig[0]?.id || 'openai/gpt-4o';
+}
+
+function getDefaultImageGenerationModel(): string {
+  const configModel = (modelConfig as any).imageGenerationModel;
+  if (configModel) return configModel;
+  return defaultModelsFromConfig.find((m) => m.id.includes('image') || m.id.includes('gemini'))?.id || defaultModelsFromConfig[0]?.id || 'openai/gpt-4o';
+}
+
 const DEFAULT_DARK: ThemeColors = {
   background: '#111827',
   surface: '#1f2937',
@@ -64,11 +83,20 @@ const DEFAULT_LIGHT: ThemeColors = {
   borderAlt: '#d1d5db'
 };
 
-type SettingsSection = 'models' | 'providers' | 'theme' | 'backup' | 'global-prompt' | 'utility-llms' | 'testing' | 'users';
+type SettingsSection = 'models' | 'providers' | 'global-defaults' | 'theme' | 'backup' | 'global-prompt' | 'utility-llms' | 'testing' | 'users';
 
 export default function SettingsPage() {
   const [models, setModels] = useState<Model[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
+  const [globalDefaultModels, setGlobalDefaultModels] = useState<Model[]>([]);
+  const [globalDefaultProviders, setGlobalDefaultProviders] = useState<Provider[]>([]);
+  const [globalDefaultRouterModel, setGlobalDefaultRouterModel] = useState(getDefaultRouterModel());
+  const [globalDefaultImageGenerationModel, setGlobalDefaultImageGenerationModel] = useState(getDefaultImageGenerationModel());
+  const [globalDefaultsLoading, setGlobalDefaultsLoading] = useState(false);
+  const [globalDefaultsSaving, setGlobalDefaultsSaving] = useState(false);
+  const [globalDefaultsResetting, setGlobalDefaultsResetting] = useState(false);
+  const [globalDefaultsValidation, setGlobalDefaultsValidation] = useState<{ valid: boolean; message: string } | null>(null);
+  const [exportingToJson, setExportingToJson] = useState(false);
   const [validatingAll, setValidatingAll] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -139,7 +167,7 @@ export default function SettingsPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get('tab');
-      if (tab && ['models', 'providers', 'theme', 'global-prompt', 'utility-llms', 'backup', 'testing', 'users'].includes(tab)) {
+      if (tab && ['models', 'providers', 'global-defaults', 'theme', 'global-prompt', 'utility-llms', 'backup', 'testing', 'users'].includes(tab)) {
         setActiveSection(tab as SettingsSection);
       }
     }
@@ -213,8 +241,14 @@ export default function SettingsPage() {
     }
   }, [activeSection, isAdmin]);
 
-  const fetchProviderModels = async (providerId: string) => {
-    const provider = providers.find(p => p.id === providerId);
+  useEffect(() => {
+    if (activeSection === 'global-defaults' && isAdmin) {
+      loadGlobalDefaults();
+    }
+  }, [activeSection, isAdmin]);
+
+  const fetchProviderModels = async (providerId: string, providerList: Provider[] = providers) => {
+    const provider = providerList.find(p => p.id === providerId);
     if (!provider || !provider.endpoint) return;
 
     setFetchingModels(true);
@@ -275,18 +309,78 @@ export default function SettingsPage() {
     m.name.toLowerCase().includes(openRouterSearch.toLowerCase())
   ).slice(0, 50); // Limit to 50 to keep UI snappy
 
+  const readOpenRouterPrice = (value: unknown): number | null => {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value !== 'string' || value.trim() === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const getOpenRouterModelPricing = (model: any) => {
+    const pricing = model?.pricing || {};
+    const inputPerToken = readOpenRouterPrice(pricing.prompt ?? pricing.input);
+    const outputPerToken = readOpenRouterPrice(pricing.completion ?? pricing.output);
+
+    if (inputPerToken !== null || outputPerToken !== null) {
+      return {
+        input: inputPerToken === null ? 0 : inputPerToken * 1_000_000,
+        output: outputPerToken === null ? 0 : outputPerToken * 1_000_000,
+        source: 'OpenRouter'
+      };
+    }
+
+    const localPricing = MODEL_PRICING[model?.id];
+    if (localPricing) {
+      return { input: localPricing.input, output: localPricing.output, source: 'Saved' };
+    }
+
+    return null;
+  };
+
+  const formatModelPrice = (value: number) => {
+    if (!Number.isFinite(value)) return 'N/A';
+    if (value === 0) return '$0.00';
+    if (value < 0.01) return `$${value.toFixed(6)}`;
+    if (value < 1) return `$${value.toFixed(4)}`;
+    return `$${value.toFixed(2)}`;
+  };
+
+  const formatOpenRouterModelPricing = (model: any) => {
+    const pricing = getOpenRouterModelPricing(model);
+    if (!pricing) return 'Price unavailable';
+    return `${pricing.source}: In ${formatModelPrice(pricing.input)} / Out ${formatModelPrice(pricing.output)} per 1M`;
+  };
+
+  const getOpenRouterModelUrl = (model: any) => {
+    if (model?.url) return model.url;
+    const modelId = String(model?.id || '').trim();
+    return `https://openrouter.ai/models/${encodeURIComponent(modelId).replace(/%2F/g, '/')}`;
+  };
+
   const saveModel = () => {
     if (!modelId.trim() || !modelName.trim()) return;
-    if (editingModel) {
-      setModels(prev => prev.map(m => m.id === editingModel.id ? { id: modelId.trim(), name: modelName.trim(), provider: modelProvider } : m));
+    const isGlobalDefaultsMode = activeSection === 'global-defaults';
+    if (isGlobalDefaultsMode) {
+      setGlobalDefaultModels(prev => prev.map(m => m.id === editingModel?.id ? { id: modelId.trim(), name: modelName.trim(), provider: modelProvider } : m));
+      if (!editingModel) {
+        setGlobalDefaultModels(prev => [...prev, { id: modelId.trim(), name: modelName.trim(), provider: modelProvider }]);
+      }
     } else {
-      setModels(prev => [...prev, { id: modelId.trim(), name: modelName.trim(), provider: modelProvider }]);
+      if (editingModel) {
+        setModels(prev => prev.map(m => m.id === editingModel.id ? { id: modelId.trim(), name: modelName.trim(), provider: modelProvider } : m));
+      } else {
+        setModels(prev => [...prev, { id: modelId.trim(), name: modelName.trim(), provider: modelProvider }]);
+      }
     }
     setShowAddModal(false);
   };
 
   const deleteModel = (id: string) => {
-    setModels(prev => prev.filter(m => m.id !== id));
+    if (activeSection === 'global-defaults') {
+      setGlobalDefaultModels(prev => prev.filter(m => m.id !== id));
+    } else {
+      setModels(prev => prev.filter(m => m.id !== id));
+    }
   };
 
   const openAddProviderModal = () => {
@@ -299,22 +393,33 @@ export default function SettingsPage() {
 
   const saveProvider = () => {
     if (!providerName.trim() || !providerEndpoint.trim()) return;
-    // Prevent editing openrouter
     if (editingProvider && editingProvider.id === 'openrouter') return;
-    
+    const isGlobalDefaultsMode = activeSection === 'global-defaults';
     const id = providerName.toLowerCase().replace(/\s+/g, '-');
-    if (editingProvider) {
-      setProviders(prev => prev.map(p => p.id === editingProvider.id ? { ...p, name: providerName.trim(), endpoint: providerEndpoint.trim(), type: providerType } : p));
+    if (isGlobalDefaultsMode) {
+      setGlobalDefaultProviders(prev => prev.map(p => p.id === editingProvider?.id ? { ...p, name: providerName.trim(), endpoint: providerEndpoint.trim(), type: providerType } : p));
+      if (!editingProvider) {
+        setGlobalDefaultProviders(prev => [...prev, { id, name: providerName.trim(), endpoint: providerEndpoint.trim(), type: providerType }]);
+      }
     } else {
-      setProviders(prev => [...prev, { id, name: providerName.trim(), endpoint: providerEndpoint.trim(), type: providerType }]);
+      if (editingProvider) {
+        setProviders(prev => prev.map(p => p.id === editingProvider.id ? { ...p, name: providerName.trim(), endpoint: providerEndpoint.trim(), type: providerType } : p));
+      } else {
+        setProviders(prev => [...prev, { id, name: providerName.trim(), endpoint: providerEndpoint.trim(), type: providerType }]);
+      }
     }
     setShowProviderModal(false);
   };
 
   const deleteProvider = (id: string) => {
     if (id === 'openrouter') return;
-    setProviders(prev => prev.filter(p => p.id !== id));
-    setModels(prev => prev.filter(m => m.provider !== id));
+    if (activeSection === 'global-defaults') {
+      setGlobalDefaultProviders(prev => prev.filter(p => p.id !== id));
+      setGlobalDefaultModels(prev => prev.filter(m => m.provider !== id));
+    } else {
+      setProviders(prev => prev.filter(p => p.id !== id));
+      setModels(prev => prev.filter(m => m.provider !== id));
+    }
   };
 
   const [importing, setImporting] = useState(false);
@@ -409,6 +514,36 @@ export default function SettingsPage() {
     setDraggedIndex(null);
   };
 
+  const handleGlobalModelDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleGlobalModelDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    const updated = [...globalDefaultModels];
+    const draggedItem = updated[draggedIndex];
+    updated.splice(draggedIndex, 1);
+    updated.splice(index, 0, draggedItem);
+    setGlobalDefaultModels(updated);
+    setDraggedIndex(index);
+  };
+
+  const handleGlobalProviderDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleGlobalProviderDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    const updated = [...globalDefaultProviders];
+    const draggedItem = updated[draggedIndex];
+    updated.splice(draggedIndex, 1);
+    updated.splice(index, 0, draggedItem);
+    setGlobalDefaultProviders(updated);
+    setDraggedIndex(index);
+  };
+
   async function handleSave() {
     setSaving(true);
     localStorage.setItem('theme', theme);
@@ -458,8 +593,8 @@ export default function SettingsPage() {
     }
   }
 
-  const getProviderName = (providerId: string) => {
-    const provider = providers.find(p => p.id === providerId);
+  const getProviderName = (providerId: string, providerList: Provider[] = providers) => {
+    const provider = providerList.find(p => p.id === providerId);
     return provider?.name || providerId;
   };
 
@@ -507,7 +642,7 @@ export default function SettingsPage() {
     setSelectedProviderFilters(new Set());
   };
 
-  const validateModelId = async (model: Model) => {
+  const validateModelId = async (model: Model, providerList: Provider[] = providers) => {
     setValidatingId(model.id);
     try {
       if (model.provider === 'openrouter') {
@@ -520,7 +655,7 @@ export default function SettingsPage() {
           [model.id]: { valid: isValid, message: isValid ? 'Valid' : 'Not found on OpenRouter' }
         }));
       } else {
-        const provider = providers.find(p => p.id === model.provider);
+        const provider = providerList.find(p => p.id === model.provider);
         if (provider?.endpoint) {
           let url = provider.endpoint;
           if (provider.id === 'ollama') {
@@ -558,10 +693,10 @@ export default function SettingsPage() {
     }
   };
 
-  const validateAll = async () => {
+  const validateAll = async (modelsToValidate: Model[] = models, providerList: Provider[] = providers) => {
     setValidatingAll(true);
-    for (const model of models) {
-      await validateModelId(model);
+    for (const model of modelsToValidate) {
+      await validateModelId(model, providerList);
     }
     setValidatingAll(false);
   };
@@ -675,6 +810,103 @@ export default function SettingsPage() {
     }
   };
 
+  const loadGlobalDefaults = async () => {
+    if (!isAdmin) return;
+    setGlobalDefaultsLoading(true);
+    setGlobalDefaultsValidation(null);
+    try {
+      const res = await fetch('/api/admin/global-defaults');
+      const data = await res.json();
+      if (res.ok) {
+        setGlobalDefaultModels(data.models || []);
+        setGlobalDefaultProviders(data.providers || []);
+        const models = data.models || [];
+        setGlobalDefaultRouterModel(data.routerModel || getDefaultRouterModel());
+        setGlobalDefaultImageGenerationModel(data.imageGenerationModel || getDefaultImageGenerationModel());
+      } else {
+        setGlobalDefaultsValidation({ valid: false, message: data.error || 'Failed to load new user defaults.' });
+      }
+    } catch (e: any) {
+      setGlobalDefaultsValidation({ valid: false, message: 'Failed to load new user defaults: ' + e.message });
+    } finally {
+      setGlobalDefaultsLoading(false);
+    }
+  };
+
+  const handleSaveGlobalDefaults = async () => {
+    if (!isAdmin) return;
+    setGlobalDefaultsSaving(true);
+    setGlobalDefaultsValidation(null);
+    try {
+      const res = await fetch('/api/admin/global-defaults', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          models: globalDefaultModels, 
+          providers: globalDefaultProviders,
+          routerModel: globalDefaultRouterModel,
+          imageGenerationModel: globalDefaultImageGenerationModel
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setGlobalDefaultsValidation({ valid: true, message: 'New user defaults saved. Existing users were not changed.' });
+        showToast('New user defaults saved successfully.', 'success');
+      } else {
+        setGlobalDefaultsValidation({ valid: false, message: data.error || 'Validation failed.' });
+        showToast(data.error || 'Validation failed.', 'error');
+      }
+    } catch (e: any) {
+      setGlobalDefaultsValidation({ valid: false, message: 'Failed to save new user defaults: ' + e.message });
+      showToast('Failed to save new user defaults.', 'error');
+    } finally {
+      setGlobalDefaultsSaving(false);
+    }
+  };
+
+  const handleResetGlobalDefaults = async () => {
+    if (!isAdmin) return;
+    if (!confirm('Reset saved new user defaults? Existing users will not be changed.')) return;
+    setGlobalDefaultsResetting(true);
+    setGlobalDefaultsValidation(null);
+    try {
+      const res = await fetch('/api/admin/global-defaults', { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok) {
+        setGlobalDefaultModels(defaultModelsFromConfig);
+        setGlobalDefaultProviders(defaultProvidersFromConfig);
+        setGlobalDefaultsValidation({ valid: true, message: 'Saved new user defaults removed. New users will use app defaults.' });
+        showToast(data.message || 'New user defaults reset.', 'success');
+      } else {
+        setGlobalDefaultsValidation({ valid: false, message: data.error || 'Failed to reset new user defaults.' });
+        showToast(data.error || 'Failed to reset new user defaults.', 'error');
+      }
+    } catch (e: any) {
+      setGlobalDefaultsValidation({ valid: false, message: 'Failed to reset new user defaults: ' + e.message });
+      showToast('Failed to reset new user defaults.', 'error');
+    } finally {
+      setGlobalDefaultsResetting(false);
+    }
+  };
+
+  const handleExportToJson = async () => {
+    if (!isAdmin) return;
+    setExportingToJson(true);
+    try {
+      const res = await fetch('/api/admin/global-defaults/export', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`Exported ${data.modelsCount} models from ${data.providersCount} providers to models.json`, 'success');
+      } else {
+        showToast(data.error || 'Failed to export to models.json', 'error');
+      }
+    } catch (e: any) {
+      showToast('Failed to export: ' + e.message, 'error');
+    } finally {
+      setExportingToJson(false);
+    }
+  };
+
   const handleResetPassword = async (userId: string, userName: string) => {
     if (!confirm(`Are you sure you want to reset the password for ${userName}? A new temporary password will be emailed to them.`)) return;
     setResettingUserId(userId);
@@ -748,6 +980,7 @@ export default function SettingsPage() {
     { id: 'utility-llms', label: 'Utility LLMs', icon: '' },
     { id: 'backup', label: 'Backup & Restore', icon: '' },
     { id: 'testing', label: 'Automated Testing', icon: '' },
+    ...(isAdmin ? [{ id: 'global-defaults' as SettingsSection, label: 'New User Defaults', icon: '' }] : []),
     ...(isAdmin ? [{ id: 'users' as SettingsSection, label: 'User Management', icon: '' }] : [])
   ];
 
@@ -824,7 +1057,7 @@ export default function SettingsPage() {
                       : `Showing ${filteredModels.length} of ${models.length} models`}
                   </span>
                   <div className="flex gap-2">
-                    <button onClick={validateAll} disabled={validatingAll} className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded transition disabled:opacity-50">
+                    <button onClick={() => validateAll()} disabled={validatingAll} className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded transition disabled:opacity-50">
                       {validatingAll ? 'Checking...' : 'Check All'}
                     </button>
                     <button onClick={() => setShowImportExportModal(true)} className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded transition flex items-center gap-1.5">
@@ -1055,6 +1288,211 @@ export default function SettingsPage() {
                     </div>
                   )}
                 </div>
+              </>
+            )}
+
+            {activeSection === 'global-defaults' && isAdmin && (
+              <>
+                <h1 className="text-2xl font-bold text-indigo-400">New User Defaults</h1>
+                <p className="text-sm text-gray-400">
+                  Configure the providers and models assigned when a new user registers. Existing users are not changed.
+                </p>
+
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={loadGlobalDefaults} disabled={globalDefaultsLoading} className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded transition disabled:opacity-50">
+                    {globalDefaultsLoading ? 'Loading...' : 'Refresh'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setGlobalDefaultModels(defaultModelsFromConfig);
+                      setGlobalDefaultProviders(defaultProvidersFromConfig);
+                      setGlobalDefaultsValidation({ valid: true, message: 'Loaded app defaults locally. Click Validate & Save to persist them for new users.' });
+                    }}
+                    className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded transition"
+                  >
+                    Load App Defaults
+                  </button>
+                  <button onClick={handleResetGlobalDefaults} disabled={globalDefaultsResetting} className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded transition disabled:opacity-50">
+                    {globalDefaultsResetting ? 'Resetting...' : 'Reset Saved Defaults'}
+                  </button>
+                  <button onClick={handleSaveGlobalDefaults} disabled={globalDefaultsSaving} className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded transition disabled:opacity-50">
+                    {globalDefaultsSaving ? 'Validating...' : 'Validate & Save'}
+                  </button>
+                  <button onClick={handleExportToJson} disabled={exportingToJson} className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded transition disabled:opacity-50">
+                    {exportingToJson ? 'Exporting...' : 'Export to models.json'}
+                  </button>
+                </div>
+
+                {globalDefaultsValidation && (
+                  <div className={`p-3 rounded-lg border text-sm ${
+                    globalDefaultsValidation.valid
+                      ? 'bg-green-900/20 border-green-700/50 text-green-300'
+                      : 'bg-red-900/20 border-red-700/50 text-red-300'
+                  }`}>
+                    {globalDefaultsValidation.message}
+                  </div>
+                )}
+
+                {globalDefaultsLoading ? (
+                  <div className="p-8 text-center text-gray-500 border border-gray-800 rounded-lg bg-gray-950">Loading new user defaults...</div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    <div className="border border-gray-800 rounded-lg overflow-hidden bg-gray-950">
+                      <div className="p-4 border-b border-gray-800 flex justify-between items-center">
+                        <div>
+                          <h3 className="text-sm font-semibold text-gray-200">Default Providers</h3>
+                          <p className="text-[10px] text-gray-500 mt-1">{globalDefaultProviders.length} providers configured</p>
+                        </div>
+                        <button onClick={openAddProviderModal} className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded transition">+ Add Provider</button>
+                      </div>
+                      <div className="p-4 space-y-2">
+                        {globalDefaultProviders.length === 0 ? (
+                          <div className="text-center text-sm text-gray-500 py-6">No default providers configured.</div>
+                        ) : (
+                          globalDefaultProviders.map((p, index) => (
+                            <div 
+                              key={p.id} 
+                              draggable
+                              onDragStart={() => handleGlobalProviderDragStart(index)}
+                              onDragOver={(e) => handleGlobalProviderDragOver(e, index)}
+                              onDragEnd={handleDragEnd}
+                              className={`p-3 rounded border bg-gray-900/50 border-gray-800/60 cursor-move ${draggedIndex === index ? 'opacity-50' : ''}`}
+                            >
+                              <div className="flex items-start gap-2">
+                                <div className="text-gray-600 hover:text-gray-400 pt-0.5">
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                                  </svg>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-gray-100">{p.name}</span>
+                                    <span className={`text-[9px] px-1.5 py-0.5 rounded border ${
+                                      p.id === 'openrouter'
+                                        ? 'bg-indigo-900/40 text-indigo-300 border-indigo-500/30'
+                                        : 'bg-gray-800 text-gray-400 border-gray-700'
+                                    }`}>{p.id === 'openrouter' ? 'Built-in' : p.type}</span>
+                                  </div>
+                                  <span className="text-[10px] font-mono block text-gray-500 truncate">{p.id}</span>
+                                  <span className="text-[10px] font-mono block text-gray-600 truncate">{p.endpoint}</span>
+                                </div>
+                                {p.id !== 'openrouter' && (
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <button onClick={() => openEditProviderModal(p)} className="text-xs px-1.5 py-1 rounded text-gray-500 hover:text-indigo-400 transition">Edit</button>
+                                    <button onClick={() => deleteProvider(p.id)} className="text-xs px-1.5 py-1 rounded text-gray-500 hover:text-red-400 transition">Del</button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="border border-gray-800 rounded-lg overflow-hidden bg-gray-950">
+                      <div className="p-4 border-b border-gray-800 flex justify-between items-center">
+                        <div>
+                          <h3 className="text-sm font-semibold text-gray-200">Default Models</h3>
+                          <p className="text-[10px] text-gray-500 mt-1">{globalDefaultModels.length} models configured</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => { setValidationResults({}); validateAll(globalDefaultModels, globalDefaultProviders); }} disabled={globalDefaultModels.length === 0} className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded transition disabled:opacity-50">Check All</button>
+                          <button
+                            onClick={() => {
+                              setEditingModel(null);
+                              setModelId('');
+                              setModelName('');
+                              setModelProvider('openrouter');
+                              setAvailableModels([]);
+                              setShowAddModal(true);
+                            }}
+                            className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded transition"
+                          >+ Add Model</button>
+                        </div>
+                      </div>
+                      <div className="p-4 space-y-2">
+                        {globalDefaultModels.length === 0 ? (
+                          <div className="text-center text-sm text-gray-500 py-6">No default models configured.</div>
+                        ) : (
+                          globalDefaultModels.map((m, index) => {
+                            const validationResult = validationResults[m.id];
+                            const isInvalid = validationResult && !validationResult.valid;
+                            const isValid = validationResult && validationResult.valid;
+                            return (
+                              <div 
+                                key={m.id} 
+                                draggable
+                                onDragStart={() => handleGlobalModelDragStart(index)}
+                                onDragOver={(e) => handleGlobalModelDragOver(e, index)}
+                                onDragEnd={handleDragEnd}
+                                className={`p-3 rounded border ${isInvalid ? 'border-red-700/50 bg-red-900/10' : 'bg-gray-900/50 border-gray-800/60'} ${draggedIndex === index ? 'opacity-50' : ''} cursor-move`}
+                              >
+                                <div className="flex items-start gap-2">
+                                  <div className="text-gray-600 hover:text-gray-400 pt-0.5">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                                    </svg>
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`text-sm font-medium ${isInvalid ? 'text-red-300' : 'text-gray-100'}`}>{m.name}</span>
+                                      {isValid && <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-900/40 text-green-300 border border-green-700/50">Valid</span>}
+                                      {isInvalid && <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-900/40 text-red-300 border border-red-700/50" title={validationResult.message}>Invalid</span>}
+                                    </div>
+                                    <span className="text-[10px] font-mono block text-gray-500 truncate">{m.id}</span>
+                                    <span className="text-[10px] text-gray-400">Provider: {getProviderName(m.provider, globalDefaultProviders)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <button onClick={() => validateModelId(m, globalDefaultProviders)} className="text-xs px-1.5 py-1 rounded text-gray-500 hover:text-indigo-400 transition">Check</button>
+                                    <button onClick={() => { setEditingModel(m); setModelId(m.id); setModelName(m.name); setModelProvider(m.provider); setShowAddModal(true); }} className="text-xs px-1.5 py-1 rounded text-gray-500 hover:text-indigo-400 transition">Edit</button>
+                                    <button onClick={() => deleteModel(m.id)} className="text-xs px-1.5 py-1 rounded text-gray-500 hover:text-red-400 transition">Del</button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border border-gray-800 rounded-lg overflow-hidden bg-gray-950">
+                    <div className="p-4 border-b border-gray-800">
+                      <h3 className="text-sm font-semibold text-gray-200">Default Utility LLMs</h3>
+                      <p className="text-[10px] text-gray-500 mt-1">Select default models for routing and image generation for new users</p>
+                    </div>
+                    <div className="p-4 space-y-4">
+                      <div>
+                        <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 block mb-2">Router LLM</label>
+                        <select
+                          value={globalDefaultRouterModel}
+                          onChange={(e) => setGlobalDefaultRouterModel(e.target.value)}
+                          className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-100 focus:outline-none focus:border-indigo-500"
+                        >
+                          {globalDefaultModels.map(m => (
+                            <option key={m.id} value={m.id}>{m.name} ({m.id})</option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-gray-600 mt-1">Used for intent classification and routing decisions</p>
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 block mb-2">Image Generation LLM</label>
+                        <select
+                          value={globalDefaultImageGenerationModel}
+                          onChange={(e) => setGlobalDefaultImageGenerationModel(e.target.value)}
+                          className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-100 focus:outline-none focus:border-indigo-500"
+                        >
+                          {globalDefaultModels.map(m => (
+                            <option key={m.id} value={m.id}>{m.name} ({m.id})</option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-gray-600 mt-1">Used for generating images when requested</p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+                )}
               </>
             )}
 
@@ -1624,9 +2062,9 @@ export default function SettingsPage() {
                 <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1 text-gray-500">Provider</label>
                 <div className="flex gap-2">
                   <select value={modelProvider} onChange={(e) => { setModelProvider(e.target.value); setAvailableModels([]); }} className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
-                    {providers.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                    {(activeSection === 'global-defaults' ? globalDefaultProviders : providers).map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
                   </select>
-                  <button onClick={() => fetchProviderModels(modelProvider)} disabled={fetchingModels} className="text-xs px-2 py-1.5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50 transition">
+                  <button onClick={() => fetchProviderModels(modelProvider, activeSection === 'global-defaults' ? globalDefaultProviders : providers)} disabled={fetchingModels} className="text-xs px-2 py-1.5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50 transition">
                     {fetchingModels ? '...' : '↓'}
                   </button>
                 </div>
@@ -1678,7 +2116,8 @@ export default function SettingsPage() {
               <button onClick={() => setShowOpenRouterModal(false)} className="text-gray-400 hover:text-white">✕</button>
             </div>
             <div className="p-4 flex-1 overflow-hidden flex flex-col">
-              <div className="relative mb-3">
+              <p className="text-[10px] text-gray-500 mt-2">Prices are shown per 1M tokens when available.</p>
+              <div className="relative mb-3 mt-3">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
@@ -1698,14 +2137,39 @@ export default function SettingsPage() {
                   <div className="text-center text-gray-500 py-8 text-xs">No models found matching your search.</div>
                 ) : (
                   filteredOpenRouterModels.map((m: any) => (
-                    <button
-                      key={m.id}
+                    <div
+                      role="button"
+                      tabIndex={0}
                       onClick={() => selectOpenRouterModel(m)}
-                      className={`w-full text-left px-3 py-2 rounded border transition text-xs group ${modelId === m.id ? 'bg-indigo-900/40 border-indigo-500/50' : 'bg-gray-800/50 border-gray-700 hover:bg-gray-800 hover:border-gray-600'}`}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          selectOpenRouterModel(m);
+                        }
+                      }}
+                      className={`w-full text-left px-3 py-2.5 rounded border transition text-sm group ${modelId === m.id ? 'bg-indigo-900/40 border-indigo-500/50' : 'bg-gray-800/50 border-gray-700 hover:bg-gray-800 hover:border-gray-600'}`}
                     >
                       <div className="font-semibold text-indigo-300 group-hover:text-indigo-200 truncate">{m.name}</div>
-                      <div className="text-[10px] text-gray-500 font-mono truncate">{m.id}</div>
-                    </button>
+                      <div className="flex items-center justify-between gap-3 mt-1">
+                        <div className="text-xs text-gray-500 font-mono truncate">{m.id}</div>
+                        <div className="flex items-center justify-end gap-2 shrink-0">
+                          <div className="text-xs text-gray-400 whitespace-nowrap" title={formatOpenRouterModelPricing(m)}>{formatOpenRouterModelPricing(m)}</div>
+                          <a
+                            href={getOpenRouterModelUrl(m)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 whitespace-nowrap"
+                            aria-label={`Open ${m.name} on OpenRouter`}
+                          >
+                            Link
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
                   ))
                 )}
               </div>

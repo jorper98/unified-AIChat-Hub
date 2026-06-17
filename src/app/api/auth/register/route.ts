@@ -4,6 +4,40 @@ import { hashPassword, generateVerificationToken } from '@/lib/auth';
 import { ObjectId } from 'mongodb';
 import nodemailer from 'nodemailer';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import modelConfig from '@/config/models.json';
+
+const GLOBAL_DEFAULTS_ID = 'global_new_user_defaults';
+
+const DEFAULT_PROVIDERS = modelConfig.providers.map((p: any) => ({ id: p.id, name: p.name, type: p.type, endpoint: p.endpoint }));
+const DEFAULT_MODELS = modelConfig.selectedModels.map((id: string) => {
+  for (const provider of modelConfig.providers) {
+    const model = provider.models.find((m: any) => m.id === id);
+    if (model) return { id: model.id, name: model.name, provider: provider.id };
+  }
+  return { id, name: id, provider: 'openrouter' };
+});
+
+function getDefaultRouterModel(): string {
+  return (modelConfig as any).routerModel || DEFAULT_MODELS[0]?.id || 'openai/gpt-4o';
+}
+
+function getDefaultImageGenerationModel(): string {
+  const configModel = (modelConfig as any).imageGenerationModel;
+  if (configModel) return configModel;
+  return DEFAULT_MODELS.find((m) => m.id.includes('image') || m.id.includes('gemini'))?.id || DEFAULT_MODELS[0]?.id || 'openai/gpt-4o';
+}
+
+async function getNewUserDefaults(db: any) {
+  const globalDefaults = await db.collection('settings').findOne({ _id: GLOBAL_DEFAULTS_ID as any });
+  const models = Array.isArray(globalDefaults?.models) && globalDefaults.models.length > 0 ? globalDefaults.models : DEFAULT_MODELS;
+  const providers = Array.isArray(globalDefaults?.providers) && globalDefaults.providers.length > 0 ? globalDefaults.providers : DEFAULT_PROVIDERS;
+  return {
+    models,
+    providers,
+    routerModel: globalDefaults?.routerModel || getDefaultRouterModel(),
+    imageGenerationModel: globalDefaults?.imageGenerationModel || getDefaultImageGenerationModel()
+  };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,6 +82,13 @@ export async function POST(request: NextRequest) {
       freeUses: 0,
       hasSeenWelcomeModal: false,
       createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const newUserDefaults = await getNewUserDefaults(db);
+    await db.collection('settings').insertOne({
+      userId: result.insertedId,
+      ...newUserDefaults,
       updatedAt: new Date(),
     });
 

@@ -23,6 +23,10 @@ export async function getProviderForModel(modelId: string) {
       return { ...provider, endpoint: configProvider.endpoint, apiKeyEnv: configProvider.apiKeyEnv };
     }
   }
+
+  if (provider.id === 'openrouter' && !provider.apiKeyEnv) {
+    return { ...provider, apiKeyEnv: 'OPENROUTER_API_KEY' };
+  }
   
   return provider;
 }

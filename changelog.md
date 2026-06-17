@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.4.10
+- Added admin-controlled global defaults for new user registration, allowing admins to configure default providers and models.
+- Added "New User Defaults" tab in Settings for managing global defaults with drag-and-drop reordering.
+- Added "Export to models.json" button to sync admin changes back to the config file.
+- Added Router LLM and Image Generation LLM selection in global defaults.
+- Added cost display (per 1M tokens) in OpenRouter model browser with source indicator.
+- Added OpenRouter link with arrow icon to model browser cards.
+- New users now receive a personal settings document at registration with the configured global defaults.
+
 ## v0.4.9
 - Added independent Import/Export for Models & Providers configuration, allowing users to back up and restore their model settings separately from general data.
 - Fixed duplicate "Model ID" field in the model add/edit modal; replaced with "Model Display Name".
