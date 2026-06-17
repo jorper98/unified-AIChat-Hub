@@ -7,16 +7,46 @@
       "endpoint": "https://openrouter.ai/api/v1/chat/completions",
       "apiKeyEnv": "OPENROUTER_API_KEY",
       "models": [
-        { "id": "openai/gpt-4o-mini", "name": "GPT-4o Mini (OpenAI)", "default": true },
-        { "id": "openai/gpt-4o", "name": "GPT-4o (OpenAI)", "default": true },
-        { "id": "anthropic/claude-3.5-sonnet", "name": "Claude 3.5 Sonnet (Anthropic)", "default": true },
-        { "id": "anthropic/claude-3-opus", "name": "Claude 3 Opus (Anthropic)", "default": true },
-        { "id": "deepseek/deepseek-chat", "name": "DeepSeek Chat (DeepSeek)", "default": true },
-        { "id": "google/gemini-pro", "name": "Gemini Pro (Google)", "default": true },
-        { "id": "google/gemini-flash-lite", "name": "Gemini Flash Lite (Google)", "default": true },
-        { "id": "qwen/qwen-2.5-72b-instruct", "name": "Qwen 2.5 72B (Alibaba)", "default": true },
-        { "id": "minimax/minimax-m2.7", "name": "MiniMax M2.7 (MiniMax)", "default": true },
-        { "id": "moonshot/kimi-k2", "name": "Kimi K2 (Moonshot)", "default": true }
+        {
+          "id": "openai/gpt-4o",
+          "name": "GPT-4o (OpenAI)",
+          "default": true
+        },
+        {
+          "id": "~moonshotai/kimi-latest",
+          "name": "MoonshotAI Kimi Latest",
+          "default": true
+        },
+        {
+          "id": "deepseek/deepseek-chat",
+          "name": "DeepSeek Chat (DeepSeek)",
+          "default": true
+        },
+        {
+          "id": "~google/gemini-flash-latest",
+          "name": "Google Gemini Flash Latest",
+          "default": true
+        },
+        {
+          "id": "qwen/qwen-2.5-72b-instruct",
+          "name": "Qwen 2.5 72B (Alibaba)",
+          "default": true
+        },
+        {
+          "id": "minimax/minimax-m2.7",
+          "name": "MiniMax M2.7 (MiniMax)",
+          "default": true
+        },
+        {
+          "id": "google/gemini-2.5-flash-image",
+          "name": "Google: Nano Banana (Gemini 2.5 Flash Image)",
+          "default": true
+        },
+        {
+          "id": "openai/gpt-5-image-mini",
+          "name": "OpenAI: GPT-5 Image Mini",
+          "default": true
+        }
       ]
     },
     {
@@ -46,13 +76,14 @@
   ],
   "selectedModels": [
     "openai/gpt-4o",
-    "anthropic/claude-3.5-sonnet",
-    "anthropic/claude-3-opus",
+    "~moonshotai/kimi-latest",
     "deepseek/deepseek-chat",
-    "google/gemini-pro",
-    "google/gemini-flash-lite",
+    "~google/gemini-flash-latest",
     "qwen/qwen-2.5-72b-instruct",
     "minimax/minimax-m2.7",
-    "moonshot/kimi-k2"
-  ]
+    "google/gemini-2.5-flash-image",
+    "openai/gpt-5-image-mini"
+  ],
+  "routerModel": "openai/gpt-4o",
+  "imageGenerationModel": "openai/gpt-5-image-mini"
 }

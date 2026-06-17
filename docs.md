@@ -1,6 +1,6 @@
 # Unified Chat Hub - Complete Documentation
 
-**Version:** 0.4.9  
+**Version:** 0.4.10  
 **Copyright:** (c) 2026 Jorge Pereira (35sites.com LLC)  
 **Website:** https://35sites.com  
 **License:** MIT License
@@ -536,6 +536,53 @@ Key configuration:
 - `eslint.ignoreDuringBuilds`: Prevents ESLint errors from blocking production builds
 - `rewrites`: Redirects `/images/*` requests to the API route to bypass static file caching in production
 
+### Model Configuration (`src/config/models.json`)
+
+The `models.json` file defines the default providers and models available in the application. This file is used as the fallback when no admin-configured global defaults exist in the database.
+
+**Structure:**
+```json
+{
+  "providers": [
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "type": "api",
+      "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "models": [
+        {
+          "id": "openai/gpt-4o",
+          "name": "GPT-4o (OpenAI)",
+          "default": true
+        }
+      ]
+    }
+  ],
+  "selectedModels": [
+    "openai/gpt-4o",
+    "anthropic/claude-3.5-sonnet"
+  ],
+  "routerModel": "openai/gpt-4o",
+  "imageGenerationModel": "google/gemini-pro"
+}
+```
+
+**Fields:**
+- `providers`: Array of provider configurations
+  - `id`: Unique provider identifier (alphanumeric, underscores, dashes)
+  - `name`: Display name
+  - `type`: "api" or "local"
+  - `endpoint`: API endpoint URL
+  - `apiKeyEnv`: Environment variable name for API key (or null)
+  - `models`: Array of models available from this provider
+- `selectedModels`: Array of model IDs that are available for selection
+- `routerModel`: Default model for intent classification (used when no admin defaults exist)
+- `imageGenerationModel`: Default model for image generation (used when no admin defaults exist)
+
+**Admin Override:**
+Administrators can override these defaults via the "New User Defaults" settings tab. Changes are stored in MongoDB and take precedence over `models.json`. The "Export to models.json" button syncs admin changes back to this file for version control.
+
 ### Settings UI Configuration
 
 The application includes a comprehensive Settings UI accessible from the main interface. Settings are stored in MongoDB and take effect immediately without server restart.
@@ -544,7 +591,7 @@ The application includes a comprehensive Settings UI accessible from the main in
 
 1. **Models**
    - Configure available AI models
-   - **OpenRouter Model Browser**: Built-in UI to search and select from available OpenRouter models when adding/editing.
+   - **OpenRouter Model Browser**: Built-in UI to search and select from available OpenRouter models when adding/editing. Displays cost per 1M tokens (input/output) with source indicator (OpenRouter API or saved config). Each model card includes a direct link to the OpenRouter model page.
    - Set default models for different tasks
    - Validate model IDs against provider APIs
    - Drag-and-drop reordering
@@ -579,6 +626,15 @@ The application includes a comprehensive Settings UI accessible from the main in
 7. **Automated Testing**
    - One-click UI testing to verify routing, context injection, and API integrations
    - **SMTP Email Testing**: Dedicated one-click test button to verify your email configuration.
+
+8. **New User Defaults** *(Admin Only)*
+   - Configure default providers and models assigned to new users at registration
+   - **Drag-and-drop reordering** for both providers and models
+   - **Router LLM selection**: Choose which model handles intent classification
+   - **Image Generation LLM selection**: Choose which model handles image generation
+   - **Export to models.json**: Sync admin changes back to the config file for version control
+   - New users receive a personal settings document with these defaults at registration
+   - Existing users are not affected by changes to global defaults
 
 ### Docker Configuration
 
@@ -1061,6 +1117,93 @@ Run automated routing tests from the UI.
     "total": "number"
   },
   "results": [...]
+}
+```
+
+---
+
+### Admin: Global Defaults
+
+These endpoints manage the default providers and models assigned to new users at registration. Requires admin authentication.
+
+#### GET `/api/admin/global-defaults`
+Get the current global defaults for new users.
+
+**Response:**
+```json
+{
+  "models": [
+    {
+      "id": "openai/gpt-4o",
+      "name": "GPT-4o (OpenAI)",
+      "provider": "openrouter"
+    }
+  ],
+  "providers": [
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "type": "api",
+      "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+      "apiKeyEnv": "OPENROUTER_API_KEY"
+    }
+  ],
+  "routerModel": "openai/gpt-4o",
+  "imageGenerationModel": "google/gemini-pro"
+}
+```
+
+#### POST `/api/admin/global-defaults`
+Update the global defaults for new users.
+
+**Request Body:**
+```json
+{
+  "models": [...],
+  "providers": [...],
+  "routerModel": "openai/gpt-4o",
+  "imageGenerationModel": "google/gemini-pro"
+}
+```
+
+**Validation:**
+- At least one provider and one model required
+- Provider IDs must be unique and contain only letters, numbers, underscores, and dashes
+- Model IDs must be unique
+- Each model must reference a valid provider ID
+- OpenRouter provider configuration is locked (name, type, endpoint cannot be changed)
+- Router and image generation models must exist in the models list
+
+**Response:**
+```json
+{
+  "success": true,
+  "providers": [...],
+  "models": [...]
+}
+```
+
+#### DELETE `/api/admin/global-defaults`
+Reset global defaults to use `models.json` configuration.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Saved new user defaults removed. New users will use app defaults."
+}
+```
+
+#### POST `/api/admin/global-defaults/export`
+Export current global defaults to `src/config/models.json` for version control.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Exported to models.json successfully",
+  "providersCount": 4,
+  "modelsCount": 6
 }
 ```
 

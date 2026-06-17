@@ -5,7 +5,7 @@ import { SettingsDocument } from '@/lib/types';
 import { ObjectId } from 'mongodb';
 import { verifyAuthToken } from '@/lib/auth';
 
-const DEFAULT_PROVIDERS = modelConfig.providers.map((p: any) => ({ id: p.id, name: p.name, type: p.type }));
+const DEFAULT_PROVIDERS = modelConfig.providers.map((p: any) => ({ id: p.id, name: p.name, type: p.type, endpoint: p.endpoint }));
 const DEFAULT_MODELS = modelConfig.selectedModels.map((id: string) => {
   for (const provider of modelConfig.providers) {
     const model = provider.models.find((m: any) => m.id === id);
