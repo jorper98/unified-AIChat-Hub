@@ -56,7 +56,7 @@ export function WelcomeModal({ isOpen, onClose, isDark }: WelcomeModalProps) {
           </p>
           <ul className="list-disc pl-5 space-y-1">
             <li><strong>Add your own OpenRouter API Key:</strong> Bring your own key for unlimited, pay-as-you-go access.</li>
-            <li><strong>Purchase Credits:</strong> Buy additional message credits directly through the app, starting at just $2.00 increments.</li>
+            <li><strong>Purchase Credits:</strong> Buy additional message credits for $3.00 per 50 messages.</li>
           </ul>
         </div>
 
@@ -69,7 +69,7 @@ export function WelcomeModal({ isOpen, onClose, isDark }: WelcomeModalProps) {
             {isSaving ? 'Saving...' : 'Maybe Later'}
           </button>
           <button
-            onClick={() => { /* Placeholder for purchase flow */ alert('Credit purchasing coming soon! Please add your own API key for now.'); }}
+            onClick={() => { handleDismiss(); router.push('/checkout'); }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition border ${isDark ? 'border-gray-600 text-gray-300 hover:bg-gray-800' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
           >
             Purchase Credits

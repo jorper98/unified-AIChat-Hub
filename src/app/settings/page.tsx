@@ -92,6 +92,8 @@ export default function SettingsPage() {
   const [globalDefaultProviders, setGlobalDefaultProviders] = useState<Provider[]>([]);
   const [globalDefaultRouterModel, setGlobalDefaultRouterModel] = useState(getDefaultRouterModel());
   const [globalDefaultImageGenerationModel, setGlobalDefaultImageGenerationModel] = useState(getDefaultImageGenerationModel());
+  const [globalDefaultCreditPrice, setGlobalDefaultCreditPrice] = useState(300);
+  const [globalDefaultCreditAmount, setGlobalDefaultCreditAmount] = useState(50);
   const [globalDefaultsLoading, setGlobalDefaultsLoading] = useState(false);
   const [globalDefaultsSaving, setGlobalDefaultsSaving] = useState(false);
   const [globalDefaultsResetting, setGlobalDefaultsResetting] = useState(false);
@@ -146,6 +148,7 @@ export default function SettingsPage() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [resettingUserId, setResettingUserId] = useState<string | null>(null);
   const [resettingCreditsUserId, setResettingCreditsUserId] = useState<string | null>(null);
+  const [zeroingUserId, setZeroingUserId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
   // Testing state
@@ -823,6 +826,8 @@ export default function SettingsPage() {
         const models = data.models || [];
         setGlobalDefaultRouterModel(data.routerModel || getDefaultRouterModel());
         setGlobalDefaultImageGenerationModel(data.imageGenerationModel || getDefaultImageGenerationModel());
+        setGlobalDefaultCreditPrice(data.creditPrice ?? 300);
+        setGlobalDefaultCreditAmount(data.creditAmount ?? 50);
       } else {
         setGlobalDefaultsValidation({ valid: false, message: data.error || 'Failed to load new user defaults.' });
       }
@@ -845,13 +850,16 @@ export default function SettingsPage() {
           models: globalDefaultModels, 
           providers: globalDefaultProviders,
           routerModel: globalDefaultRouterModel,
-          imageGenerationModel: globalDefaultImageGenerationModel
+          imageGenerationModel: globalDefaultImageGenerationModel,
+          creditPrice: globalDefaultCreditPrice,
+          creditAmount: globalDefaultCreditAmount
         }),
       });
       const data = await res.json();
       if (res.ok) {
-        setGlobalDefaultsValidation({ valid: true, message: 'New user defaults saved. Existing users were not changed.' });
-        showToast('New user defaults saved successfully.', 'success');
+        setGlobalDefaultsValidation({ valid: true, message: 'New user defaults saved.' });
+        showToast('Defaults saved successfully.', 'success');
+        loadGlobalDefaults();
       } else {
         setGlobalDefaultsValidation({ valid: false, message: data.error || 'Validation failed.' });
         showToast(data.error || 'Validation failed.', 'error');
@@ -875,6 +883,8 @@ export default function SettingsPage() {
       if (res.ok) {
         setGlobalDefaultModels(defaultModelsFromConfig);
         setGlobalDefaultProviders(defaultProvidersFromConfig);
+        setGlobalDefaultCreditPrice(300);
+        setGlobalDefaultCreditAmount(50);
         setGlobalDefaultsValidation({ valid: true, message: 'Saved new user defaults removed. New users will use app defaults.' });
         showToast(data.message || 'New user defaults reset.', 'success');
       } else {
@@ -969,6 +979,29 @@ export default function SettingsPage() {
       showToast('Failed to reset credits', 'error');
     } finally {
       setResettingCreditsUserId(null);
+    }
+  };
+
+  const handleZeroMessageBalance = async (userId: string, userName: string) => {
+    if (!confirm(`Are you sure you want to set purchased message balance to 0 for ${userName}?`)) return;
+    setZeroingUserId(userId);
+    try {
+      const res = await fetch('/api/admin/users/zero-balance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast('Message balance set to 0 successfully', 'success');
+        loadUsers();
+      } else {
+        showToast(data.error || 'Failed to zero message balance', 'error');
+      }
+    } catch (e: any) {
+      showToast('Failed to zero message balance', 'error');
+    } finally {
+      setZeroingUserId(null);
     }
   };
 
@@ -1306,6 +1339,10 @@ export default function SettingsPage() {
                     onClick={() => {
                       setGlobalDefaultModels(defaultModelsFromConfig);
                       setGlobalDefaultProviders(defaultProvidersFromConfig);
+                      setGlobalDefaultRouterModel(getDefaultRouterModel());
+                      setGlobalDefaultImageGenerationModel(getDefaultImageGenerationModel());
+                      setGlobalDefaultCreditPrice(300);
+                      setGlobalDefaultCreditAmount(50);
                       setGlobalDefaultsValidation({ valid: true, message: 'Loaded app defaults locally. Click Validate & Save to persist them for new users.' });
                     }}
                     className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded transition"
@@ -1316,7 +1353,7 @@ export default function SettingsPage() {
                     {globalDefaultsResetting ? 'Resetting...' : 'Reset Saved Defaults'}
                   </button>
                   <button onClick={handleSaveGlobalDefaults} disabled={globalDefaultsSaving} className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded transition disabled:opacity-50">
-                    {globalDefaultsSaving ? 'Validating...' : 'Validate & Save'}
+                    {globalDefaultsSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                   <button onClick={handleExportToJson} disabled={exportingToJson} className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded transition disabled:opacity-50">
                     {exportingToJson ? 'Exporting...' : 'Export to models.json'}
@@ -1487,12 +1524,66 @@ export default function SettingsPage() {
                             <option key={m.id} value={m.id}>{m.name} ({m.id})</option>
                           ))}
                         </select>
-                        <p className="text-[10px] text-gray-600 mt-1">Used for generating images when requested</p>
+<p className="text-[10px] text-gray-600 mt-1">Used for generating images when requested</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border border-gray-800 rounded-lg overflow-hidden bg-gray-950">
+                    <div className="p-4 border-b border-gray-800">
+                      <h3 className="text-sm font-semibold text-gray-200">Credit Pricing</h3>
+                      <p className="text-[10px] text-gray-500 mt-1">Configure the price and message count for credit purchases</p>
+                    </div>
+                    <div className="p-4 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 block mb-2">
+                            Price (USD)
+                          </label>
+                          <input
+                            type="number"
+                            value={globalDefaultCreditPrice / 100}
+                            onChange={(e) => {
+                              const value = parseFloat(e.target.value);
+                              if (!isNaN(value) && value >= 0) {
+                                setGlobalDefaultCreditPrice(Math.round(value * 100));
+                              }
+                            }}
+                            min="0"
+                            step="0.01"
+                            className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-100 focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <p className="text-[10px] text-gray-600 mt-1">Cost per credit pack in dollars</p>
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 block mb-2">
+                            Messages per Pack
+                          </label>
+                          <input
+                            type="number"
+                            value={globalDefaultCreditAmount}
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value, 10);
+                              if (!isNaN(value) && value > 0) {
+                                setGlobalDefaultCreditAmount(value);
+                              }
+                            }}
+                            min="1"
+                            step="1"
+                            className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-100 focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <p className="text-[10px] text-gray-600 mt-1">Number of messages for each purchase</p>
+                        </div>
+                      </div>
+                      <div className="p-3 rounded-lg bg-gray-900/50 border border-gray-800/60">
+                        <p className="text-xs text-gray-300">
+                          Preview: <span className="font-semibold text-indigo-400">${(globalDefaultCreditPrice / 100).toFixed(2)} for {globalDefaultCreditAmount} messages</span>
+                        </p>
                       </div>
                     </div>
                   </div>
                 </>
-                )}
+              )}
               </>
             )}
 
@@ -1984,7 +2075,7 @@ export default function SettingsPage() {
                             <th className="px-4 py-3">Email</th>
                             <th className="px-4 py-3">Role</th>
                             <th className="px-4 py-3">Verified</th>
-                            <th className="px-4 py-3">Free Uses</th>
+                            <th className="px-4 py-3">Available Credits</th>
                             <th className="px-4 py-3 text-right">Actions</th>
                           </tr>
                         </thead>
@@ -2005,8 +2096,22 @@ export default function SettingsPage() {
                                   <span className="text-red-400">No</span>
                                 )}
                               </td>
-                              <td className="px-4 py-3 text-gray-300 font-mono">
-                                {user.freeUses || 0} / 15
+                              <td className="px-4 py-3 text-gray-300 font-mono space-y-0.5">
+                                <div className="flex items-center gap-1.5 text-[11px]">
+                                  <span className={(() => {
+                                    const remaining = Math.max(0, 15 - (user.freeUses || 0));
+                                    return remaining > 5 ? 'text-green-400' : remaining > 0 ? 'text-yellow-400' : 'text-gray-500';
+                                  })()}>
+                                    {Math.max(0, 15 - (user.freeUses || 0))} free
+                                  </span>
+                                  <span className="text-gray-600">·</span>
+                                  <span className={(() => {
+                                    const bal = user.messageBalance || 0;
+                                    return bal >= 3 ? 'text-green-400' : bal > 0 ? 'text-yellow-400' : 'text-gray-500';
+                                  })()}>
+                                    {user.messageBalance || 0} purchased
+                                  </span>
+                                </div>
                               </td>
                               <td className="px-4 py-3 text-right space-x-2">
                                 <button
@@ -2024,6 +2129,13 @@ export default function SettingsPage() {
                                       className="px-2 py-1 rounded text-xs bg-green-900/30 text-green-400 hover:bg-green-900/50 border border-green-800/50 disabled:opacity-50"
                                     >
                                       {resettingCreditsUserId === user._id ? 'Resetting...' : 'Reset Credits'}
+                                    </button>
+                                    <button
+                                      onClick={() => handleZeroMessageBalance(user._id, user.name)}
+                                      disabled={zeroingUserId === user._id}
+                                      className="px-2 py-1 rounded text-xs bg-amber-900/30 text-amber-400 hover:bg-amber-900/50 border border-amber-800/50 disabled:opacity-50"
+                                    >
+                                      {zeroingUserId === user._id ? 'Zeroing...' : 'Zero Balance'}
                                     </button>
                                     <button
                                       onClick={() => handleDeleteUser(user._id, user.name)}
@@ -2044,9 +2156,11 @@ export default function SettingsPage() {
               </>
             )}
 
-            <button onClick={handleSave} disabled={saving} className="w-full px-4 py-3 rounded font-semibold text-sm tracking-wide transition text-white bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-800">
-              {saving ? 'Saving...' : 'Save Settings'}
-            </button>
+            {activeSection !== 'global-defaults' && activeSection !== 'users' && activeSection !== 'testing' && (
+              <button onClick={handleSave} disabled={saving} className="w-full px-4 py-3 rounded font-semibold text-sm tracking-wide transition text-white bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-800">
+                {saving ? 'Saving...' : 'Save Settings'}
+              </button>
+            )}
           </div>
         </div>
       </div>

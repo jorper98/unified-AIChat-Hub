@@ -180,13 +180,27 @@ export function ThreadSidebar({
               <div className="flex items-center gap-2">
                 <span className={`text-xs font-medium truncate ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>{user.name}</span>
                 {user.role !== 'admin' && !user.hasApiKey && (
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold ${
-                    (15 - (user.freeUses || 0)) > 5 
-                      ? (isDark ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-700')
-                      : (isDark ? 'bg-yellow-900/50 text-yellow-400' : 'bg-yellow-100 text-yellow-700')
-                  }`}>
-                    {15 - (user.freeUses || 0)}
-                  </span>
+                  (user.freeUses || 0) < 15 ? (
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold ${
+                      (15 - (user.freeUses || 0)) > 5 
+                        ? (isDark ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-700')
+                        : (isDark ? 'bg-yellow-900/50 text-yellow-400' : 'bg-yellow-100 text-yellow-700')
+                    }`}>
+                      {15 - (user.freeUses || 0)}
+                    </span>
+                  ) : (
+                    <span 
+                      className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold cursor-pointer ${
+                        (user.messageBalance || 0) < 3 
+                          ? (isDark ? 'bg-red-900/50 text-red-400 hover:bg-red-900/70' : 'bg-red-100 text-red-700 hover:bg-red-200')
+                          : (isDark ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-700')
+                      }`}
+                      onClick={() => { if ((user.messageBalance || 0) < 3) window.location.href = '/checkout'; }}
+                      title={(user.messageBalance || 0) < 3 ? 'Low credits - click to purchase more' : 'Purchased message credits'}
+                    >
+                      {user.messageBalance || 0}
+                    </span>
+                  )
                 )}
               </div>
               <span className={`text-[10px] truncate ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{user.email}</span>

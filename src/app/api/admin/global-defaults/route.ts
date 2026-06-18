@@ -26,6 +26,8 @@ type ValidatedDefaults = {
   models: ModelDefaults[];
   routerModel?: string;
   imageGenerationModel?: string;
+  creditPrice?: number;
+  creditAmount?: number;
 };
 
 function getDefaultProviders(): ProviderDefaults[] {
@@ -206,6 +208,22 @@ function validateDefaults(input: unknown): { ok: true; defaults: ValidatedDefaul
     result.imageGenerationModel = imageGenerationModel || undefined;
   }
 
+  if (input.creditPrice !== undefined) {
+    const creditPrice = Number(input.creditPrice);
+    if (!Number.isInteger(creditPrice) || creditPrice < 0) {
+      return { ok: false, error: 'Credit price must be a non-negative integer in cents (e.g., 300 for $3.00).' };
+    }
+    result.creditPrice = creditPrice;
+  }
+
+  if (input.creditAmount !== undefined) {
+    const creditAmount = Number(input.creditAmount);
+    if (!Number.isInteger(creditAmount) || creditAmount <= 0) {
+      return { ok: false, error: 'Credit amount must be a positive integer (e.g., 50 for 50 messages).' };
+    }
+    result.creditAmount = creditAmount;
+  }
+
   return { ok: true, defaults: result };
 }
 
@@ -241,7 +259,9 @@ export async function GET(request: NextRequest) {
     models,
     providers: stored?.providers || getDefaultProviders(),
     routerModel: stored?.routerModel || defaultRouterModel,
-    imageGenerationModel: stored?.imageGenerationModel || defaultImageModel
+    imageGenerationModel: stored?.imageGenerationModel || defaultImageModel,
+    creditPrice: stored?.creditPrice ?? 300,
+    creditAmount: stored?.creditAmount ?? 50,
   });
 }
 
