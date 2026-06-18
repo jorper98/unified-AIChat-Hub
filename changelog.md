@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.4.11
+- Added Stripe payment integration for purchasing message credits ($3.00 for 50 messages).
+- Credit pricing now configurable in Settings → New User Defaults → Credit Pricing section.
+- New checkout page at `/checkout` with Stripe redirected payment flow.
+- Message balance system: users without their own API key use 15 free messages first, then draw from purchased credits.
+- Credits badge in sidebar turns red when message balance falls below 3 and navigates to checkout.
+- Added Stripe webhook handler for credit fulfillment on successful payments.
+- Added "Export to models.json" button now includes credit pricing configuration.
+- Updated API Key Required modal to include a "Purchase Credits" option when credits are exhausted.
+- Updated Welcome Modal to link "Purchase Credits" button to the new checkout page.
+- Added "Zero Balance" button in User Management to reset purchased credits to 0.
+
 ## v0.4.10
 - Added admin-controlled global defaults for new user registration, allowing admins to configure default providers and models.
 - Added "New User Defaults" tab in Settings for managing global defaults with drag-and-drop reordering.

@@ -73,6 +73,13 @@ export async function POST(request: NextRequest) {
       modelsJson.imageGenerationModel = stored.imageGenerationModel;
     }
 
+    if (stored.creditPrice !== undefined) {
+      modelsJson.creditPrice = stored.creditPrice;
+    }
+    if (stored.creditAmount !== undefined) {
+      modelsJson.creditAmount = stored.creditAmount;
+    }
+
     // Write to models.json
     const modelsJsonPath = join(process.cwd(), 'src', 'config', 'models.json');
     await writeFile(modelsJsonPath, JSON.stringify(modelsJson, null, 2), 'utf-8');

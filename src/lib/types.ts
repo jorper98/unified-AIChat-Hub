@@ -25,6 +25,8 @@ export interface SettingsDocument {
   imageGenerationModel?: string;
   timezone?: string;
   weatherLocation?: string;
+  creditPrice?: number;
+  creditAmount?: number;
   updatedAt?: Date;
 }
 

@@ -545,7 +545,7 @@ export default function UnifiedChatInterface() {
 
     // Require API key for all users EXCEPT admin (who can fall back to global .env key)
     // or users who still have free uses remaining (< 15)
-    if (!user?.hasApiKey && user?.role !== 'admin' && (user?.freeUses || 0) >= 15) {
+    if (!user?.hasApiKey && user?.role !== 'admin' && (user?.freeUses || 0) >= 15 && (user?.messageBalance || 0) <= 0) {
       setShowApiKeyWarning(true);
       return;
     }
@@ -593,7 +593,7 @@ export default function UnifiedChatInterface() {
       
       // Update user freeUses count if the backend returned it
       if (data.freeUses !== undefined && user) {
-        setUser({ ...user, freeUses: data.freeUses });
+        setUser({ ...user, freeUses: data.freeUses, messageBalance: data.messageBalance !== undefined ? data.messageBalance : user.messageBalance });
       }
 
       if (data.threadId) {
@@ -832,10 +832,14 @@ export default function UnifiedChatInterface() {
               <svg className="h-8 w-8 text-yellow-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>API Key Required</h3>
+              <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                {user?.role !== 'admin' && !user?.hasApiKey && (user?.freeUses || 0) >= 15 && (user?.messageBalance || 0) <= 0 ? 'Credits Expired' : 'API Key Required'}
+              </h3>
             </div>
             <p className={`mb-6 text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-              Please setup your OpenRouter API key in the settings page before sending messages. Each user must provide their own API key to use the chat.
+              {user?.role !== 'admin' && !user?.hasApiKey && (user?.freeUses || 0) >= 15 && (user?.messageBalance || 0) <= 0 
+                ? 'Your free messages have been used. Purchase more credits or add your own OpenRouter API key in Settings to continue.'
+                : 'Please setup your OpenRouter API key in the settings page before sending messages. Each user must provide their own API key to use the chat.'}
             </p>
             <div className="flex justify-end gap-3">
               <button
@@ -844,6 +848,14 @@ export default function UnifiedChatInterface() {
               >
                 Cancel
               </button>
+              {user?.role !== 'admin' && !user?.hasApiKey && (user?.freeUses || 0) >= 15 && (
+                <button
+                  onClick={() => router.push('/checkout')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition border ${isDark ? 'border-indigo-500 text-indigo-400 hover:bg-indigo-900/30' : 'border-indigo-400 text-indigo-600 hover:bg-indigo-50'}`}
+                >
+                  Purchase Credits
+                </button>
+              )}
               <button
                 onClick={() => router.push('/settings?tab=utility-llms')}
                 className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition"

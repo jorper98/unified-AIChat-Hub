@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     response.cookies.set('auth_token', token, {
       httpOnly: true,
       secure: process.env.SECURE_COOKIE === 'true',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: rememberMe ? 60 * 60 * 24 : 60 * 60, // 24 hours or 1 hour
       path: '/',
     });

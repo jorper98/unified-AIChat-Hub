@@ -28,15 +28,17 @@ export async function POST(request: NextRequest) {
     const userDoc = await db.collection('users').findOne({ _id: new ObjectId(userId) });
     const isAdmin = userDoc?.role === 'admin';
     const freeUses = userDoc?.freeUses || 0;
+    const messageBalance = userDoc?.messageBalance || 0;
 
-    if (!isAdmin && !userDoc?.openRouterApiKey && freeUses >= 15) {
+    if (!isAdmin && !userDoc?.openRouterApiKey && freeUses >= 15 && messageBalance <= 0) {
       return NextResponse.json({ 
-        error: 'You have used your 15 free API calls. Please configure your OpenRouter API key in Settings.',
+        error: 'You have used your free messages. Please purchase more credits or configure your OpenRouter API key in Settings.',
         code: 'MISSING_API_KEY'
       }, { status: 400 });
     }
 
     let apiKey: string | undefined = undefined;
+    let useMessageBalance = false;
     if (userDoc?.openRouterApiKey) {
       try {
         const { decrypt } = await import('@/lib/encryption');
@@ -47,10 +49,14 @@ export async function POST(request: NextRequest) {
     }
     
     let incrementFreeUses = false;
-    if (!apiKey && (isAdmin || freeUses < 15)) {
+    if (!apiKey && (isAdmin || freeUses < 15 || messageBalance > 0)) {
       apiKey = process.env.OPENROUTER_API_KEY;
-      if (!isAdmin && freeUses < 15) {
-        incrementFreeUses = true;
+      if (!isAdmin) {
+        if (freeUses < 15) {
+          incrementFreeUses = true;
+        } else if (messageBalance > 0) {
+          useMessageBalance = true;
+        }
       }
     }
 
@@ -391,11 +397,18 @@ export async function POST(request: NextRequest) {
     });
 
     let updatedFreeUses = userDoc?.freeUses || 0;
+    let updatedMessageBalance = messageBalance;
     if (incrementFreeUses) {
       updatedFreeUses += 1;
       await db.collection('users').updateOne(
         { _id: new ObjectId(userId) },
         { $inc: { freeUses: 1 } }
+      );
+    } else if (useMessageBalance) {
+      updatedMessageBalance -= 1;
+      await db.collection('users').updateOne(
+        { _id: new ObjectId(userId) },
+        { $inc: { messageBalance: -1 } }
       );
     }
 
@@ -403,6 +416,7 @@ export async function POST(request: NextRequest) {
       threadId: activeThreadId.toHexString(), 
       response: aiTextOutput,
       freeUses: updatedFreeUses,
+      messageBalance: updatedMessageBalance,
       routingTool: routerResult?.route === 'image_generation' ? imageGenerationModel : routerResult?.route === 'web_search' ? 'web_search' : 'direct',
       perplexityUsed: perplexityUsage ? true : false,
       usage: {
