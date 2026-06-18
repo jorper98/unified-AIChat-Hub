@@ -1,6 +1,6 @@
 # Unified Chat Hub
 
-## Version 0.4.10
+## Version 0.4.12
 
 ### About
 Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a unified interface for interacting with multiple LLM models within the same chat (Thread). You can search across all chats, track tokens and costs, and manage your interactions securely. It relies on OpenRouter, featuring an intelligent intent router that classifies queries and routes them to different tools or your directly selected LLM response. 
@@ -37,6 +37,7 @@ Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a un
 - Customizable theme colors: Fully configurable dark and light mode colors including background, surface, text, accent, border, and secondary/tertiary backgrounds via the Settings UI.
 - OpenRouter Model Browser: Built-in UI to easily browse, search, and select from available OpenRouter models when adding or editing.
 - SMTP Email Testing: Dedicated one-click test button in Settings to verify email configuration.
+- Credit Purchasing: Admins can configure Stripe-powered credit purchases ($X.XX for Y messages) in Settings. Users buy credits through secure Stripe Checkout. Credits are shown in red when below threshold, with quick access to purchase more.
 
 ### Technical Stack
 - Frontend: Next.js 14.1.4, React 18.2.0, TypeScript 5.4.3
