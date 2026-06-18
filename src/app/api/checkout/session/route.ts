@@ -3,7 +3,13 @@ import { getCurrentUserId } from '@/lib/user';
 import { getDb } from '@/lib/db';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+function getStripe() {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) {
+    throw new Error('STRIPE_SECRET_KEY not configured');
+  }
+  return new Stripe(secretKey);
+}
 
 const GLOBAL_DEFAULTS_ID = 'global_new_user_defaults';
 
@@ -14,16 +20,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    if (!process.env.STRIPE_SECRET_KEY) {
-      return NextResponse.json({ error: 'Stripe is not configured' }, { status: 500 });
-    }
-
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3031';
 
     const db = await getDb();
     const storedDefaults = await db.collection('settings').findOne({ _id: GLOBAL_DEFAULTS_ID as any });
     const creditPrice = storedDefaults?.creditPrice ?? 300;
     const creditAmount = storedDefaults?.creditAmount ?? 50;
+
+    const stripe = getStripe();
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -59,6 +63,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ url: session.url });
   } catch (error: any) {
     console.error('Checkout session error:', error);
+    if (error.message?.includes('STRIPE_SECRET_KEY')) {
+      return NextResponse.json({ error: 'Stripe is not configured' }, { status: 500 });
+    }
     return NextResponse.json({ error: error.message || 'Failed to create checkout session' }, { status: 500 });
   }
 }

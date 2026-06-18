@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUserId } from '@/lib/user';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+function getStripe() {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) {
+    throw new Error('STRIPE_SECRET_KEY not configured');
+  }
+  return new Stripe(secretKey);
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,10 +24,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'session_id is required' }, { status: 400 });
     }
 
-    if (!process.env.STRIPE_SECRET_KEY) {
-      return NextResponse.json({ error: 'Stripe is not configured' }, { status: 500 });
-    }
-
+    const stripe = getStripe();
     const session = await stripe.checkout.sessions.retrieve(sessionId);
 
     return NextResponse.json({
@@ -32,6 +35,9 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Checkout status error:', error);
+    if (error.message?.includes('STRIPE_SECRET_KEY')) {
+      return NextResponse.json({ error: 'Stripe is not configured' }, { status: 500 });
+    }
     return NextResponse.json({ error: error.message || 'Failed to retrieve session' }, { status: 500 });
   }
 }
