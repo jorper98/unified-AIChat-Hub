@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.4.12
+- Credit pricing UI now auto-refreshes after saving, showing updated values immediately.
+- Removed spinner arrows from price and message count inputs for cleaner UI.
+- Made "Save Settings" button conditional - hidden for sections with their own save buttons.
+- Added public `/api/checkout/pricing` endpoint for non-admin users to fetch current credit pricing.
+- Updated "Available Credits" column in User Management to show both free and purchased credits.
+
 ## v0.4.11
 - Added Stripe payment integration for purchasing message credits ($3.00 for 50 messages).
 - Credit pricing now configurable in Settings → New User Defaults → Credit Pricing section.

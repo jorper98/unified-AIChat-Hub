@@ -1,6 +1,6 @@
 # Unified Chat Hub - Complete Documentation
 
-**Version:** 0.4.11  
+**Version:** 0.4.12  
 **Copyright:** (c) 2026 Jorge Pereira (35sites.com LLC)  
 **Website:** https://35sites.com  
 **License:** MIT License
@@ -628,13 +628,32 @@ The application includes a comprehensive Settings UI accessible from the main in
    - **SMTP Email Testing**: Dedicated one-click test button to verify your email configuration.
 
 8. **New User Defaults** *(Admin Only)*
-   - Configure default providers and models assigned to new users at registration
-   - **Drag-and-drop reordering** for both providers and models
-   - **Router LLM selection**: Choose which model handles intent classification
-   - **Image Generation LLM selection**: Choose which model handles image generation
-   - **Export to models.json**: Sync admin changes back to the config file for version control
-   - New users receive a personal settings document with these defaults at registration
-   - Existing users are not affected by changes to global defaults
+    - Configure default providers and models assigned to new users at registration
+    - **Drag-and-drop reordering** for both providers and models
+    - **Router LLM selection**: Choose which model handles intent classification
+    - **Image Generation LLM selection**: Choose which model handles image generation
+    - **Credit Pricing**: Configure price (USD) and message count for credit purchases
+    - **Export to models.json**: Sync admin changes back to the config file for version control
+    - New users receive a personal settings document with these defaults at registration
+    - Existing users are not affected by changes to global defaults
+
+9. **User Management** *(Admin Only)*
+    - View all registered users with their roles, email verification status
+    - **Available Credits column**: Shows `X free · Y purchased` for each user
+    - **Reset Credits button**: Resets free uses to 0 for a user
+    - **Zero Balance button**: Sets purchased credits to 0 for a user
+    - **Reset Password button**: Generates a new password for a user
+    - **Delete button**: Removes user and cascades delete their threads, messages, settings
+
+### Credit Purchasing System
+
+Users without their own OpenRouter API key receive 15 free messages, then must purchase credits:
+
+- **Checkout Page** (`/checkout`): Secure Stripe-hosted payment page
+- **Credit Pricing** (configurable in admin settings): e.g., $3.00 for 50 messages
+- **Sidebar Badge**: Shows remaining credits; turns **red** when below 3
+- **Auto-redirect**: Users with low/no credits are prompted to purchase more
+- **Stripe Webhook**: Automatically credits accounts on successful payment
 
 ### Docker Configuration
 

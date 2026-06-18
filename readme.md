@@ -1,9 +1,11 @@
 # Unified Chat Hub
 
-## Version 0.4.10
+## Version 0.4.12
 
 ### About
 Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a unified interface for interacting with multiple LLM models within the same chat (Thread). You can search across all chats and track the tokens and costs of your interactions. It relies on OpenRouter, featuring an intelligent intent router that classifies queries and routes them to different tools or your directly selected LLM response.
+
+**v0.4.11 introduces Stripe-powered credit purchasing for non-API-key users, configurable credit pricing, and admin user credit management.**
 
 ---
 
@@ -43,6 +45,7 @@ Unified Chat Hub is a self-hosted (Local or Docker) workspace that provides a un
 - **Backup & Restore**: With ZIP export/import capabilities.
 - **Docker deployment**: Able to fully deploy via Docker container with the option to place data on a local folder.
 - **In-app automated testing**: One-click UI testing in Settings to verify routing, context injection, and API integrations.
+- **Credit purchasing**: Configurable Stripe-powered credit purchases for non-API-key users (price and message count set in admin settings).
 - **Environment-aware configuration**: Dynamic URL and port handling for seamless local, Docker, and production deployments.
 - **Reliable image serving in production**: API-based image delivery bypasses static file caching for immediate display.
 - **Increased backup capacity**: Backup file size limit raised to 500MB for larger data exports.
