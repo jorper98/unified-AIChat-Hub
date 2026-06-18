@@ -3,7 +3,8 @@
 # Pushing the tag triggers a GitHub Action to build and publish the Docker image.
 
 param (
-    [string]$NewVersion
+    [string]$NewVersion,
+    [switch]$Force
 )
 
 $SourcePath = Get-Location
@@ -37,9 +38,15 @@ $ReleaseTag = "v$NewVersion"
 
 # 3. Check if tag already exists
 $ExistingTag = git tag -l $ReleaseTag
-if ($ExistingTag) {
-    Write-Host "ERROR: Tag '$ReleaseTag' already exists. Please increment the version." -ForegroundColor Red
+if ($ExistingTag -and -not $Force) {
+    Write-Host "ERROR: Tag '$ReleaseTag' already exists. Use -Force to overwrite." -ForegroundColor Red
     exit 1
+}
+
+if ($ExistingTag -and $Force) {
+    Write-Host "Tag '$ReleaseTag' exists. Force-overwriting..." -ForegroundColor Yellow
+    git tag -d $ReleaseTag
+    git push origin :refs/tags/$ReleaseTag 2>$null
 }
 
 # 4. Create and push the tag
