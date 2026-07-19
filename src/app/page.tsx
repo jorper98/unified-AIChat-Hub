@@ -848,7 +848,7 @@ export default function UnifiedChatInterface() {
               >
                 Cancel
               </button>
-              {user?.role !== 'admin' && !user?.hasApiKey && (user?.freeUses || 0) >= 15 && (
+              {user?.role !== 'admin' && !user?.hasApiKey && (user?.freeUses || 0) >= 15 && (user?.messageBalance || 0) <= 0 && (
                 <button
                   onClick={() => router.push('/checkout')}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition border ${isDark ? 'border-indigo-500 text-indigo-400 hover:bg-indigo-900/30' : 'border-indigo-400 text-indigo-600 hover:bg-indigo-50'}`}
