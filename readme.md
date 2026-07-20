@@ -228,7 +228,7 @@ Backups run automatically every 24 hours. Snapshots are exported from the databa
 ---
 
 ### Author
-Jorge Pereira  
+Jorge Pereira
 35sites.com LLC  
 Website: [https://35sites.com/applications/unified-aichat-hub/](https://35sites.com/applications/unified-aichat-hub/)  
 Repository: [https://github.com/jorper98/unified-AIChat-Hub](https://github.com/jorper98/unified-AIChat-Hub)
